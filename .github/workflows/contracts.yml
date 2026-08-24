@@ -46,5 +46,16 @@ jobs:
 
       # `test_contracts` gates the mock ERC-20 the suite deploys. Without it the mock is not
       # compiled and every test fails at `declare("MockERC20")`.
+      #
+      # The guard is not paranoia. A misconfigured `[[test]]` target once made snforge collect
+      # zero tests and exit 0, so the job went green having verified nothing. Collecting no tests
+      # is a failure, not a pass.
       - name: Test
-        run: snforge test --features test_contracts
+        run: |
+          set -o pipefail
+          snforge test --features test_contracts 2>&1 | tee snforge.log
+          if grep -qE 'Collected 0 test|Tests: 0 passed' snforge.log; then
+            echo "::error::snforge collected no tests — the suite did not run"
+            exit 1
+          fi
+          echo "Collected: $(grep -oE 'Collected [0-9]+ test' snforge.log | head -1)"

@@ -19,3 +19,6 @@ tsconfig.tsbuildinfo
 # Cairo build output
 contracts/target/
 .snfoundry_cache/
+
+# snforge log written by CI
+contracts/snforge.log

@@ -24,6 +24,3 @@ test = "snforge test --features test_contracts"
 [[target.starknet-contract]]
 sierra = true
 casm = true
-
-[[test]]
-name = "xenia_unittest"
