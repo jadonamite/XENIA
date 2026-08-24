@@ -16,7 +16,7 @@ export function WalletBar({ wallet }: { wallet: WalletState }) {
             <div className="note">{wallet.probe?.name ?? 'Connected'}</div>
             <div className="mono">{wallet.address}</div>
           </div>
-          <button className="ghost" onClick={wallet.disconnect}>
+          <button className="pill pill-ghost pill-plain" onClick={wallet.disconnect}>
             Disconnect
           </button>
         </div>
@@ -39,7 +39,8 @@ export function WalletBar({ wallet }: { wallet: WalletState }) {
       ) : (
         <div className="row">
           {wallet.available.map((w) => (
-            <button key={w.name} disabled={wallet.connecting} onClick={() => wallet.connect(w)}>
+            <button className="pill" key={w.name} disabled={wallet.connecting} onClick={() => wallet.connect(w)}>
+              <span className="pill-chip" aria-hidden>›</span>
               {wallet.connecting ? 'Connecting…' : `Connect ${w.name}`}
             </button>
           ))}

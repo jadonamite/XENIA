@@ -81,7 +81,7 @@ export default function CreatePage() {
 
   if (link) {
     return (
-      <main>
+      <main className="app">
         <ClaimLinkCard link={link} />
         <p className="note">
           Sent {formatAmount(parseAmount(amount, token.decimals), token.decimals)} {token.symbol}.
@@ -92,7 +92,7 @@ export default function CreatePage() {
   }
 
   return (
-    <main>
+    <main className="app">
       <h1>Create a claim link</h1>
       <p className="lede">
         The funds leave your private balance now and sit in escrow until somebody claims them or the
@@ -138,7 +138,8 @@ export default function CreatePage() {
         {error && <p className="error">{error}</p>}
 
         <div className="row" style={{ marginTop: 16 }}>
-          <button disabled={!wallet.account || busy || !amount} onClick={create}>
+          <button className="pill" disabled={!wallet.account || busy || !amount} onClick={create}>
+            <span className="pill-chip" aria-hidden>›</span>
             {busy ? 'Waiting for the wallet…' : 'Lock funds and get a link'}
           </button>
         </div>

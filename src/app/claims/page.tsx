@@ -68,7 +68,7 @@ export default function ClaimsPage() {
   }
 
   return (
-    <main>
+    <main className="app">
       <h1>My links</h1>
       <p className="lede">
         Kept in this browser. The money is on-chain either way — expiry and refund are keyed to your
@@ -107,7 +107,7 @@ export default function ClaimsPage() {
                     <div className="row">
                       {state === 'claimable' && (
                         <button
-                          className="ghost"
+                          className="pill pill-ghost pill-plain"
                           onClick={() =>
                             navigator.clipboard.writeText(
                               buildClaimLink(window.location.origin, claim.sk),
@@ -119,6 +119,7 @@ export default function ClaimsPage() {
                       )}
                       {state === 'expired' && (
                         <button
+                          className="pill pill-plain"
                           disabled={!wallet.account || busy === claim.commitment}
                           onClick={() => refund(claim)}
                         >
@@ -126,7 +127,7 @@ export default function ClaimsPage() {
                         </button>
                       )}
                       {(state === 'claimed' || state === 'unknown') && (
-                        <button className="ghost" onClick={() => { forgetClaim(claim.commitment); void load(); }}>
+                        <button className="pill pill-ghost pill-plain" onClick={() => { forgetClaim(claim.commitment); void load(); }}>
                           Remove
                         </button>
                       )}

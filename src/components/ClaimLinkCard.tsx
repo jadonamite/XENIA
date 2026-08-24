@@ -34,7 +34,9 @@ export function ClaimLinkCard({ link }: { link: string }) {
       )}
       <p className="mono">{link}</p>
       <div className="row">
-        <button onClick={copy}>{copied ? 'Copied' : 'Copy link'}</button>
+        <button className="pill pill-plain" onClick={copy}>
+          {copied ? 'Copied' : 'Copy link'}
+        </button>
       </div>
       <p className="note">
         Anyone holding this link can claim it. Send it over a channel you would trust with cash.

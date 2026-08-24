@@ -27,9 +27,7 @@ describe('amounts', () => {
       ['1000000', 18],
       ['0', 6],
     ] as const) {
-      expect(formatAmount(parseAmount(value, decimals), decimals)).toBe(
-        value === '.5' ? '0.5' : String(Number(value)),
-      );
+      expect(formatAmount(parseAmount(value, decimals), decimals)).toBe(value);
     }
   });
 

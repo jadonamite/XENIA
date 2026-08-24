@@ -21,6 +21,7 @@ export default function ClaimPage() {
   const [ready, setReady] = useState(false);
   const [entry, setEntry] = useState<ClaimEntry | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
@@ -37,6 +38,8 @@ export default function ClaimPage() {
       setLoadError(null);
     } catch (cause) {
       setLoadError(cause instanceof Error ? cause.message : 'Could not read the escrow');
+    } finally {
+      setChecked(true);
     }
   }, []);
 
@@ -70,11 +73,11 @@ export default function ClaimPage() {
     }
   }
 
-  if (!ready) return <main />;
+  if (!ready) return <main className="app" />;
 
   if (!key) {
     return (
-      <main>
+      <main className="app">
         <h1>That link is incomplete</h1>
         <p className="lede">
           The key travels after the <span className="mono">#</span>. Some apps cut a link short when
@@ -87,7 +90,7 @@ export default function ClaimPage() {
   if (txHash) {
     const token = entry ? tokenLabel(entry.token) : null;
     return (
-      <main>
+      <main className="app">
         <h1 className="ok">Claimed</h1>
         <p className="lede">
           {entry && token
@@ -106,13 +109,20 @@ export default function ClaimPage() {
   const token = entry ? tokenLabel(entry.token) : null;
 
   return (
-    <main>
+    <main className="app">
       <h1>You have been sent money privately</h1>
 
       {loadError && <p className="error">{loadError}</p>}
 
-      {status === 'unknown' && !loadError && (
+      {status === 'unknown' && !loadError && !checked && (
         <p className="lede">Looking this link up on Starknet…</p>
+      )}
+
+      {checked && !entry && !loadError && (
+        <p className="lede">
+          Nothing is locked against this link. It was already claimed and cleared, refunded to the
+          sender, or the link is not a Xenia link.
+        </p>
       )}
 
       {entry && token && (
@@ -140,7 +150,8 @@ export default function ClaimPage() {
               <WalletBar wallet={wallet} />
               {error && <p className="error">{error}</p>}
               <div className="row" style={{ marginTop: 16 }}>
-                <button disabled={!wallet.account || busy} onClick={claim}>
+                <button className="pill" disabled={!wallet.account || busy} onClick={claim}>
+                  <span className="pill-chip" aria-hidden>›</span>
                   {busy ? 'Waiting for the wallet…' : 'Claim'}
                 </button>
               </div>
