@@ -140,15 +140,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "privacy"
-version = "0.1.0"
-source = "git+https://github.com/starkware-libs/starknet-privacy?rev=51652200561151499b03f90e3a05f03c91f5b349#51652200561151499b03f90e3a05f03c91f5b349"
-dependencies = [
- "openzeppelin",
- "starkware_utils",
-]
-
-[[package]]
 name = "snforge_scarb_plugin"
 version = "0.63.0"
 source = "registry+https://scarbs.xyz/"
@@ -164,18 +155,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "starkware_utils"
-version = "1.0.0"
-source = "git+https://github.com/starkware-libs/starkware-starknet-utils?rev=3e2fd53d99e16c87f6cf2ced53b8c842a2d54a18#3e2fd53d99e16c87f6cf2ced53b8c842a2d54a18"
-dependencies = [
- "openzeppelin",
-]
-
-[[package]]
 name = "xenia"
 version = "0.1.0"
 dependencies = [
  "openzeppelin",
- "privacy",
  "snforge_std",
 ]

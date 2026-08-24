@@ -7,7 +7,6 @@ license-file = "../LICENSE"
 [dependencies]
 starknet = "2.20.0"
 openzeppelin = "3.0.0"
-privacy = { git = "https://github.com/starkware-libs/starknet-privacy", rev = "51652200561151499b03f90e3a05f03c91f5b349" }
 
 [dev-dependencies]
 snforge_std = "0.63.0"

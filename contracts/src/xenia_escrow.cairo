@@ -14,8 +14,8 @@
 //!   claimant's address with a STARK-curve signature instead.
 //! * **Events on every state-changing path**, of which the reference emits none.
 
-use privacy::objects::OpenNoteDeposit;
 use starknet::ContractAddress;
+use crate::open_note::OpenNoteDeposit;
 
 /// Entry stored per commitment.
 ///
@@ -130,12 +130,12 @@ pub mod XeniaEscrow {
     use core::ecdsa::check_ecdsa_signature;
     use core::num::traits::Zero;
     use openzeppelin::interfaces::token::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
-    use privacy::objects::OpenNoteDeposit;
     use starknet::storage::{
         Map, StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address};
+    use crate::open_note::OpenNoteDeposit;
     use super::{
         ClaimEntry, IXeniaEscrow, XeniaOperation, claim_message, compute_commitment, errors,
         refund_message,
