@@ -7,6 +7,30 @@ The interface in §4 is frozen. Both sides build against it independently.
 
 ---
 
+## 0. Urgent — Sam, these three before you write the claim branch
+
+**0.1 Ask the sprint team for the mainnet proving service URL. Today.**
+It is not published. The Wallet API route needs only an RPC URL because the user's wallet reaches a
+prover itself; the SDK route means we reach it, and on mainnet that endpoint does not exist
+publicly. The sprint's own Day-0 doc says teams that need it should open an issue and ask, and
+calls it "the one blocker a team cannot work around on its own." We may never use it — but if the
+wallet probe fails on day 5 and we have not asked, the fallback is gone. Ask now, regardless of
+what the probe says. Telegram escalation is yours.
+
+**0.2 `XeniaEscrow` must emit an event on every state-changing path.**
+The sprint validator requires that if `contracts` is non-empty, each transaction listed in
+`strk20.json` also carries an event emitted by one of those contracts. The reference escrow emits
+nothing. A straight port gives us three valid-looking mainnet transactions that fail validation and
+score as if we never shipped. Events are specified in §4.3. Not polish.
+
+**0.3 The mainnet pool address is confirmed — the one in the STRK20 docs is Sepolia.**
+Verified values are in §5.4. Do not deploy or test against the docs address.
+
+Also read §4.1 (the frozen signature) and §4.5 (link keypair instead of a bare secret) before the
+claim branch — §4.5 changes the calldata.
+
+---
+
 ## 1. Product
 
 Pay someone privately who has never touched the privacy pool. The sender creates a claim link; the
