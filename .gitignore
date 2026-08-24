@@ -10,3 +10,8 @@ build/
 
 # private working notes, not part of the entry
 .local/
+
+# next
+.next/
+next-env.d.ts
+tsconfig.tsbuildinfo

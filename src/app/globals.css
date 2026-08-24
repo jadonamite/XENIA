@@ -1,0 +1,170 @@
+:root {
+  --bg: #0b0d12;
+  --panel: #14171f;
+  --panel-edge: #232733;
+  --ink: #e8eaf0;
+  --ink-dim: #949bad;
+  --accent: #7c5cff;
+  --accent-ink: #ffffff;
+  --good: #3ddc97;
+  --bad: #ff6b6b;
+  --radius: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.55;
+}
+
+a {
+  color: var(--accent);
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 20px 96px;
+}
+
+header.bar {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+h1 {
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+
+h2 {
+  font-size: 18px;
+  margin: 32px 0 8px;
+}
+
+p.lede {
+  color: var(--ink-dim);
+  margin-top: 0;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+label {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-dim);
+  margin-bottom: 6px;
+}
+
+.field + .field {
+  margin-top: 16px;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 10px 12px;
+  background: #0e1118;
+  border: 1px solid var(--panel-edge);
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 15px;
+  font-family: inherit;
+}
+
+input:focus,
+select:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+button {
+  font: inherit;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+}
+
+button.ghost {
+  background: transparent;
+  border-color: var(--panel-edge);
+  color: var(--ink);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.note {
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.error {
+  color: var(--bad);
+  font-size: 14px;
+}
+
+.ok {
+  color: var(--good);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--panel-edge);
+}
+
+th {
+  color: var(--ink-dim);
+  font-weight: 500;
+}

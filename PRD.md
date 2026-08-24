@@ -138,6 +138,16 @@ pub struct ClaimEntry {
 
 Keyed by `commitment`. A zero `token` means "not found".
 
+A read entry point over the same storage is required — the claim page has to show the recipient
+what they are about to claim before they connect a wallet, and it has no other way to learn it:
+
+```cairo
+fn claim_of(self: @ContractState, commitment: felt252) -> ClaimEntry;
+```
+
+Returns the zero struct for an unknown commitment rather than panicking, so a mistyped link renders
+as "not found" instead of a failed call.
+
 ### 4.3 Events — required
 
 ```cairo
@@ -271,7 +281,7 @@ server.
 
 ```
 { type: 'transfer', token, amount: 'OPEN', recipient: <claimant> }
-{ type: 'invoke',   contract: XENIA_ESCROW, calldata: [Claim, commitment, claimant,
+{ type: 'invoke',   contract: XENIA_ESCROW, calldata: [Claim, pk, claimant,
                                                        sig_r, sig_s, '${openNoteIds[0]}'] }
 ```
 
@@ -284,9 +294,11 @@ credited with a value the client never states.
 Registration is phase 0 and the invoke is phase 7, so the protocol permits register-and-claim in
 one transaction. The route does not obviously permit it.
 
-`STRK20_ACTION` in `@starknet-io/types-js` has exactly four variants — `deposit`, `withdraw`,
-`transfer`, `invoke`. There is no register action, and the transfer action's own documentation says
-it moves funds "to another registered user". `autoRegister` is an **SDK** flag, not a wallet one.
+`STRK20_ACTION` has five variants — `deposit`, `withdraw`, `transfer`, `invoke`, and
+`shadow_account_invoke` (read off `@starknet-io/starknet-types-0104`, shipped inside
+`starknet@10.7.1`; the four-variant count in ARCHITECTURE.md predates that version). None of them
+register. The transfer action's own documentation says it moves funds "to another registered user",
+and `autoRegister` is an **SDK** flag, not a wallet one.
 
 So the Wallet API route works only if the connected wallet registers the account itself while
 assembling the transaction.
