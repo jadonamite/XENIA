@@ -81,7 +81,9 @@ pub enum XeniaOperation {
 fn privacy_invoke(
     ref self: ContractState,
     operation: XeniaOperation,
-    commitment: felt252,          // Deposit: stored. Claim/Refund: looked up.
+    key: felt252,                 // Deposit: the commitment, computed client-side.
+                                  // Claim/Refund: the link public key `pk`; the contract
+                                  // recomputes poseidon(TAG, pk) and looks that up.
     token: ContractAddress,       // Deposit only
     amount: u128,                 // Deposit only
     expiry: u64,                  // Deposit only — absolute block timestamp
@@ -201,8 +203,9 @@ address and cannot produce one for their own. The link is still a bearer instrum
 the *link* can claim, because they hold `sk`. That is the product. What they cannot do is steal a
 claim already in flight.
 
-`pk` is derived from `sk` client-side and passed as `commitment`'s preimage; the contract recomputes
-`poseidon(TAG, pk)` and looks it up.
+On deposit the client passes the finished commitment, because there is no `pk` to check against
+yet. On claim and refund it passes `pk` itself and the contract recomputes the commitment — never
+trusting a caller-supplied lookup key as authorisation. Both travel in the same `key` slot.
 
 ### 4.6 Errors
 
@@ -275,7 +278,34 @@ claim-shaped transaction on testnet.
 The SDK route scores higher on integration depth, which names the SDK explicitly. Either answer is
 fine. Not knowing on Day 4 is not.
 
-### 5.4 Environment
+### 5.4 Verified mainnet values
+
+Checked against the live network by the sprint team. Use these, not the Sepolia values in the
+starter kit's `.env.example`.
+
+```bash
+CHAIN_ID=SN_MAIN                  # 0x534e5f4d41494e
+RPC_URL=https://rpc.starknet.lava.build
+POOL_ADDRESS=0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a
+```
+
+**The mainnet proving service URL is not published.** This decides the route as much as wallet
+support does:
+
+- **Wallet API route** needs an RPC URL and nothing else — the user's wallet reaches a prover
+  itself. It requires the connected wallet to implement the STRK20 methods, and not every Starknet
+  wallet does.
+- **SDK route** means we reach the proving service, so we need its URL, and on mainnet it does not
+  exist publicly yet. Teams that need it are told to open an issue and ask.
+
+Registering a viewing key and shielding need **no proof at all** — both are ordinary public
+transactions. Spending notes privately is what needs a prover, which is why the claim transaction
+does and transaction 1 does not.
+
+Probe wallet support with `wallet_strk20Balances`. It is read-only and safe to call against any
+wallet; a wallet that answers "not implemented" has told us to show a different path.
+
+### 5.5 Environment
 
 - `starknet@^10.4.0` from the npm `next` tag. A bare install resolves to 10.0.x, which has none of
   the STRK20 API — `WalletAccountV6`, `strk20InvokeTransaction` and `STRK20_ACTION` will all be
@@ -286,9 +316,9 @@ fine. Not knowing on Day 4 is not.
 - Notes mature 10 blocks after creation. A claimed note is not immediately spendable; the demo
   should not imply otherwise.
 - After any failed submission, call `invalidateProofNonceCache()` before retrying.
-- Confirm the mainnet pool address separately. The address in the docs is Sepolia.
+- The pool address in the STRK20 docs is Sepolia. The mainnet address is in §5.4.
 
-### 5.5 Pages
+### 5.6 Pages
 
 | Route | Purpose |
 |---|---|
