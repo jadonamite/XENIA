@@ -7,3 +7,6 @@ build/
 !.env.example
 *.log
 .DS_Store
+
+# private working notes, not part of the entry
+.local/
