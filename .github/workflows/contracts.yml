@@ -5,8 +5,9 @@ name: contracts
 # the contract machine has — so this workflow is where `XeniaEscrow`'s tests actually get run.
 
 on:
+  # Any branch, not just main — the contract machine cannot run snforge locally, so a push
+  # needs to produce test results without waiting on a pull request being opened.
   push:
-    branches: [main]
     paths:
       - 'contracts/**'
       - '.github/workflows/contracts.yml'
