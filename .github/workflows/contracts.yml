@@ -1,0 +1,49 @@
+name: contracts
+
+# Runs the Cairo suite on Linux, where snforge ships prebuilt binaries.
+# starknet-foundry publishes no Windows build, and compiling it from source needs more RAM than
+# the contract machine has — so this workflow is where `XeniaEscrow`'s tests actually get run.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+      - '.github/workflows/contracts.yml'
+  pull_request:
+    paths:
+      - 'contracts/**'
+      - '.github/workflows/contracts.yml'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: contracts
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: software-mansion/setup-scarb@v1
+        with:
+          scarb-version: '2.20.1'
+
+      - uses: foundry-rs/setup-snfoundry@v3
+        with:
+          starknet-foundry-version: '0.63.0'
+
+      - name: Versions
+        run: scarb --version && snforge --version
+
+      - name: Format
+        run: scarb fmt --check
+
+      - name: Build
+        run: scarb build
+
+      # `test_contracts` gates the mock ERC-20 the suite deploys. Without it the mock is not
+      # compiled and every test fails at `declare("MockERC20")`.
+      - name: Test
+        run: snforge test --features test_contracts
