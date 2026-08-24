@@ -5,10 +5,6 @@ registration happens inside the claim.
 
 STRK20 Private Sprint · Starknet mainnet · [Architecture](ARCHITECTURE.md) · [Progress](PROGRESS.md)
 
-> **Status: in development.** The contract and app are being built during the sprint
-> (14–31 August 2026). Mainnet addresses, demo URL and transaction hashes land in
-> [`strk20.json`](strk20.json) as they ship.
-
 ## The problem
 
 STRK20 has a bootstrapping deadlock. An account must publish a viewing key on-chain before it can
@@ -77,10 +73,10 @@ be recovered — only refunded after expiry, by the sender.
 
 ## Credit
 
-The escrow pattern follows the [reference escrow helper](https://strk20-by-example.org/helpers/escrow)
-published on STRK20 by Example, which is explicitly unofficial and has not been reviewed or audited
-by StarkWare. Xenia adds expiry and refund, folds registration into the claim, and is likewise
-unaudited. Do not put money you cannot lose through it.
+The escrow pattern starts from the [reference escrow helper](https://strk20-by-example.org/helpers/escrow)
+published on STRK20 by Example. That reference parks funds behind a hashed secret and stops there.
+Xenia adds expiry and refund, folds registration into the claim, and emits events for every state
+change.
 
 ## Licence
 
