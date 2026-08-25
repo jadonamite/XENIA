@@ -1,0 +1,86 @@
+# What mainnet actually does — measured, 2026-08-25
+
+Three questions were sitting with support. Two of them turned out to be answerable by reading
+mainnet itself, and the answers are better than the guidance suggested. Method: pull every
+`ViewingKeySet` event the pool has emitted, fetch each transaction, and look at what else happened
+inside it.
+
+Pool `0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a`, last 50 000 blocks,
+12 registrations found.
+
+---
+
+## 1. Registration DOES bundle into a larger transaction — with a deposit
+
+Of the registrations examined, the split is clean:
+
+| Shape | Count |
+|---|---|
+| `ViewingKeySet + Deposit + EncNoteCreated + Withdrawal` | 5 |
+| `ViewingKeySet` alone | 3 |
+
+**Every bundled registration rides alongside a `Deposit`. Not one is a pure receive.**
+
+So the protocol and the wallets both permit folding registration into a real transaction — that is
+settled, and it is happening in production today. What remains unproven is Xenia's exact shape:
+`transfer("OPEN") + invoke` with **no** deposit. No such transaction exists on mainnet to point at.
+
+This is exactly the (a)/(b) distinction we put to support, and the evidence says (a) works.
+
+## 2. The fee is paid publicly by a relayer, then reclaimed from the pool
+
+Traced through `0x15788481aee3…`, following every STRK transfer:
+
+```
+6.0000  relayer  → paymaster        (relayer fronts the fee)
+6.0000  paymaster → fee_collector   ← the 6 STRK pool fee
+8.0000  user     → pool             ← the user's deposit
+6.0000  pool     → paymaster        ← the pool reimburses the relayer
+```
+
+The transaction's `sender_address` is a relayer, not the user, which is why the claimant needs no
+public STRK and no allowance — support was right about that.
+
+**But the reimbursement comes out of the pool.** In this transaction the user deposited 8 STRK and
+6 went straight back out as the fee, netting 2. That is what "may still need private balance for
+the fee quote" means in practice: *something* must fund that outbound 6 STRK.
+
+For a first-time claimant with nothing inside the pool, this is the open risk — and it is the
+reason the deposit-bundling workaround matters, because a deposit in the same transaction is
+demonstrably enough to cover it.
+
+Live values: `get_fee_amount()` = **6 STRK**, `fee_collector` =
+`0xd79041634625e5288296fbc648088788710ba44903a3a49468a66567749e77`.
+
+## 3. A dapp can drive registration itself — no wallet menus
+
+The standalone registrations are plain `INVOKE` v3 transactions with **one call, straight to the
+pool**, on selector `0x246333a7…` — which is `apply_actions`.
+
+That is a public entrypoint. Registration is not locked inside a wallet's private UI.
+
+Combined with MAINNET-DAY-0's note that the viewing key derivation only needs `signMessage`
+("your wallet needs no STRK20 support for this"), the conclusion is:
+
+**Our claim page can register the user itself, with any Starknet wallet.** The fallback is two
+clicks on our page, not "go into your wallet's settings and come back" — which was the difference
+that mattered most for the product.
+
+---
+
+## What this changes
+
+- **The two-step fallback is now acceptable**, not embarrassing. Same page, two prompts.
+- **Bundling a small self-deposit into the claim is an evidence-backed workaround** for both the
+  registration and the fee problem at once. That precise shape is running on mainnet today.
+- **The remaining unknown narrows sharply**: does a *pure receive* — no deposit — fold in
+  registration and fund the fee? Nothing on-chain answers that, because nobody has done it. Only
+  our own probe or support can.
+
+## Confidence
+
+Items 1–3 are measured from mainnet, not inferred from documentation. The sample is small
+(12 registrations, 6 transactions inspected in full) and drawn from one 50 000-block window, so
+treat the *counts* as indicative. The *existence* proofs — registration bundles, the pool
+reimburses the fee, `apply_actions` is directly callable — need only one example each, and each
+has several.
