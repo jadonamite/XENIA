@@ -9,6 +9,7 @@ import { readClaimFromLocation } from '@/lib/xenia/link';
 import { readClaim, statusOf, type ClaimEntry } from '@/lib/xenia/escrow';
 import { useWallet } from '@/lib/xenia/useWallet';
 import { WalletBar } from '@/components/WalletBar';
+import { PillButton } from '@/components/site/Pill';
 
 const tokenLabel = (address: string) => {
   const known = TOKENS.find((t) => BigInt(t.address) === BigInt(address));
@@ -150,10 +151,9 @@ export default function ClaimPage() {
               <WalletBar wallet={wallet} />
               {error && <p className="error">{error}</p>}
               <div className="row" style={{ marginTop: 16 }}>
-                <button className="pill" disabled={!wallet.account || busy} onClick={claim}>
-                  <span className="pill-chip" aria-hidden>›</span>
+                <PillButton disabled={!wallet.account || busy} onClick={claim}>
                   {busy ? 'Waiting for the wallet…' : 'Claim'}
-                </button>
+                </PillButton>
               </div>
             </>
           )}

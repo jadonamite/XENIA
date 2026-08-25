@@ -10,6 +10,7 @@ import { saveClaim } from '@/lib/xenia/store';
 import { useWallet } from '@/lib/xenia/useWallet';
 import { ClaimLinkCard } from '@/components/ClaimLinkCard';
 import { WalletBar } from '@/components/WalletBar';
+import { PillButton } from '@/components/site/Pill';
 
 const DAY = 24 * 60 * 60;
 
@@ -138,10 +139,9 @@ export default function CreatePage() {
         {error && <p className="error">{error}</p>}
 
         <div className="row" style={{ marginTop: 16 }}>
-          <button className="pill" disabled={!wallet.account || busy || !amount} onClick={create}>
-            <span className="pill-chip" aria-hidden>›</span>
+          <PillButton disabled={!wallet.account || busy || !amount} onClick={create}>
             {busy ? 'Waiting for the wallet…' : 'Lock funds and get a link'}
-          </button>
+          </PillButton>
         </div>
       </div>
     </main>

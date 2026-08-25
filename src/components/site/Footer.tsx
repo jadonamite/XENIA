@@ -63,9 +63,9 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="footer-mark" aria-hidden>
-          Xenia
-          <Scatter count={12} offset={3} />
+        <div className="footer-mark-wrap" aria-hidden>
+          <div className="footer-mark">XENIA</div>
+          <Scatter count={16} offset={3} style={{ top: '18%', bottom: '18%' }} />
         </div>
 
         <div className="footer-base">
