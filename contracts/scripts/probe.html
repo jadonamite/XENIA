@@ -119,6 +119,16 @@ const standardWallets = [];
   window.dispatchEvent(new CustomEvent('wallet-standard:app-ready', { detail: api }));
 })();
 
+/**
+ * A registered wallet is not necessarily a Starknet wallet. Brave Wallet, for instance, registers
+ * with only `solana:*` features — talking to it as if it were Starknet produces a confusing
+ * "wallet.request is not a function" rather than a useful answer. Classify first.
+ */
+function isStarknetCapable(w) {
+  if (w.kind === 'legacy') return typeof w.obj?.request === 'function' || typeof w.obj?.enable === 'function';
+  return Object.keys(w.obj?.features ?? {}).some((f) => f.startsWith('starknet:'));
+}
+
 function findWallets() {
   const legacy = Object.keys(window)
     .filter((k) => k.startsWith('starknet'))
@@ -127,7 +137,7 @@ function findWallets() {
   const standard = standardWallets.map((w) => ({
     key: w.name ?? 'unnamed', obj: w, kind: 'standard',
   }));
-  return [...legacy, ...standard];
+  return [...legacy, ...standard].map((w) => ({ ...w, starknet: isStarknetCapable(w) }));
 }
 
 async function rpc(url, method, params) {
@@ -142,9 +152,16 @@ async function rpc(url, method, params) {
 
 let found = [];
 function refreshDetection() {
-  found = findWallets();
+  const all = findWallets();
+  found = all.filter((w) => w.starknet);
+  const others = all.filter((w) => !w.starknet);
   const isFile = location.protocol === 'file:';
-  if (found.length) {
+  if (!found.length && others.length) {
+    $('detected').innerHTML = '<span class="bad">no <b>Starknet</b> wallet detected</span> — found '
+      + others.map((w) => esc(w.key)).join(', ')
+      + ', but none of them expose Starknet features. Is Ready X installed, enabled and unlocked <em>in this browser</em>?';
+    $('connect').disabled = true;
+  } else if (found.length) {
     $('detected').innerHTML = 'detected: ' + found
       .map((w) => `<b>${esc(w.key.replace('starknet_', ''))}</b> <span class="sub">(${w.kind})</span>`)
       .join(', ');
@@ -161,6 +178,7 @@ function refreshDetection() {
       <dt>legacy objects</dt><dd>${esc(Object.keys(window).filter((k) => k.startsWith('starknet')).join(', ') || 'none')}</dd>
       <dt>wallet-standard</dt><dd>${esc(standardWallets.map((w) => w.name).join(', ') || 'none registered')}</dd>
       <dt>features</dt><dd>${esc(standardWallets.map((w) => `${w.name}: ${Object.keys(w.features || {}).join(' ')}`).join(' | ') || '—')}</dd>
+      <dt>starknet-capable</dt><dd>${esc(findWallets().filter((w) => w.starknet).map((w) => w.key).join(', ') || 'none')}</dd>
     </dl>`;
 }
 refreshDetection();
