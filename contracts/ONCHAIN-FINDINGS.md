@@ -143,3 +143,42 @@ available.
 **Confidence:** derived from the pool's source and consistent with every mainnet transaction
 observed. What is *not* established is whether sponsorship can suppress the fee withdrawal for our
 flow — that is a policy question, not a code one.
+
+---
+
+# 5. Sponsorship is not observed anywhere — measured
+
+Option 1 (a sponsored claim, emitting no fee withdrawal) was tested by classifying real pool
+transactions. For each: does it emit `Withdrawal`, and who sent the 6 STRK to the fee collector?
+
+- `SELF_PAID` — no withdrawal, fee paid publicly by the submitter
+- `RELAYER_REIMBURSED` — withdrawal present, fee fronted by someone other than the user
+- `SPONSORED` — no withdrawal, and the fee paid by a third party
+
+Sample of 18 transactions carrying `Deposit` or `OpenNoteCreated`, drawn from the last 40 000
+blocks:
+
+```
+SELF_PAID: 0    RELAYER_REIMBURSED: 18    SPONSORED: 0    NO_FEE_SEEN: 0
+```
+
+Adding the three standalone registrations examined earlier, the pattern is consistent:
+
+| Transaction | Submitter | Fee paid by | Withdrawal? |
+|---|---|---|---|
+| Registration alone | the user | the user, publicly | no |
+| Anything with notes or deposits | a relayer | relayer, reimbursed from the pool | **yes** |
+
+**Every note-bearing transaction goes through a relayer and reimburses out of the pool.** A claim is
+note-bearing. So the reimbursement withdrawal is not optional in practice, and it is what needs an
+inflow to balance against.
+
+**Conclusion: do not plan around sponsorship.** Nothing on mainnet is using it. If it exists it is a
+private arrangement, which makes it a question for the organisers rather than something we can
+switch on. Option 2 — bundling a deposit that covers the fee — is the only path demonstrated to
+work, and all 18 of those transactions are examples of it.
+
+A third path exists but does not generalise: paying the fee publicly from the user's own account,
+as the standalone registrations do. It requires a standing STRK allowance to the pool and, more
+importantly, was never observed on a note-bearing transaction — plausibly because those go through
+the proving and relayer infrastructure. Worth one probe, but not worth designing around.
