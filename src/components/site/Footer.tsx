@@ -70,7 +70,15 @@ export function Footer() {
 
         <div className="footer-base">
           <span>© 2026 Xenia. MIT licensed.</span>
-          <span>Built for the STRK20 Private Sprint.</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <Link href="/terms" style={{ color: 'inherit' }}>
+              Terms &amp; Conditions
+            </Link>
+            <span aria-hidden style={{ opacity: 0.4 }}>|</span>
+            <Link href="/privacy" style={{ color: 'inherit' }}>
+              Privacy Policy
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

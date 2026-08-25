@@ -7,6 +7,7 @@ import { PillLink } from '@/components/site/Pill';
 import { Reveal } from '@/components/site/Reveal';
 import { Scatter } from '@/components/site/Scatter';
 import { WalletGrid } from '@/components/site/WalletGrid';
+import { WhyCards } from '@/components/site/WhyCards';
 
 const BUILT_ON = ['Starknet', 'STRK20', 'Cairo', 'Next.js', 'Vercel'];
 
@@ -151,37 +152,7 @@ export default function Home() {
           </div>
         </Reveal>
 
-        <div className="cards">
-          {REASONS.map((reason, i) => (
-            <Reveal key={reason.title} delay={i * 70}>
-              <div className="card" style={{ position: 'relative', overflow: 'hidden' }}>
-                <span className="card-numeral">0{i + 1}.</span>
-                <Scatter count={9} offset={i * 4} style={{ top: '30%', bottom: '42%' }} />
-                <div style={{ position: 'relative' }}>
-                  <h3 className="card-title">{reason.title}</h3>
-                  <p className="small" style={{ marginBottom: 0 }}>
-                    {reason.body}
-                  </p>
-                </div>
-              </div>
-            </Reveal>
-          ))}
-
-          <Reveal delay={210}>
-            <div className="card card-raised">
-              <div style={{ marginBottom: 18 }}>
-                <AppMock variant="claim" />
-              </div>
-              <div>
-                <h3 className="card-title">One screen, one signature</h3>
-                <p className="small" style={{ marginBottom: 0 }}>
-                  What the recipient sees is an amount and a button. Everything the protocol needs
-                  happens behind that button, in a single transaction.
-                </p>
-              </div>
-            </div>
-          </Reveal>
-        </div>
+        <WhyCards />
       </section>
 
       {/* ---------- delegation ---------- */}

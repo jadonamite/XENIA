@@ -26,10 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
           href="https://api.fontshare.com/v2/css?f%5B%5D=switzer@400,500,600,700,401,501&display=swap"
         />
-        <link
-          rel="icon"
-          href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cmask id='m'%3E%3Crect width='100' height='100' rx='8' fill='%23fff'/%3E%3Cpath d='M-2 50 Q 50 79 102 50 Q 50 21 -2 50' fill='%23000'/%3E%3Crect x='46' y='-2' width='8' height='104' fill='%23000'/%3E%3C/mask%3E%3Crect width='100' height='100' rx='8' fill='%231391E2' mask='url(%23m)'/%3E%3C/svg%3E"
-        />
+        <link rel="icon" href="/Xenia.png" type="image/png" />
       </head>
       <body>
         <Nav />
