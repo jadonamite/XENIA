@@ -6,6 +6,7 @@
 //! equivalent property: a refund not signed by the link key reverts `NOT_REFUND_OWNER`. See
 //! `contracts/INTERFACE.md`.
 
+use openzeppelin::interfaces::token::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
 use snforge_std::signature::KeyPairTrait;
 use snforge_std::signature::stark_curve::{StarkCurveKeyPairImpl, StarkCurveSignerImpl};
 use snforge_std::{
@@ -13,7 +14,7 @@ use snforge_std::{
     start_cheat_block_timestamp_global, start_cheat_caller_address, stop_cheat_caller_address,
 };
 use starknet::ContractAddress;
-use xenia::xenia_escrow::XeniaEscrow::{ClaimCreated, ClaimRedeemed, ClaimRefunded};
+use xenia::xenia_escrow::XeniaEscrow::{ClaimCreated, ClaimPrefunded, ClaimRedeemed, ClaimRefunded};
 use xenia::xenia_escrow::{
     IXeniaEscrowDispatcher, IXeniaEscrowDispatcherTrait, XeniaOperation, claim_message,
     compute_commitment, refund_message,
@@ -25,6 +26,9 @@ const CLAIMANT: felt252 = 'CLAIMANT';
 const ATTACKER: felt252 = 'ATTACKER';
 
 const AMOUNT: u128 = 1_000_000;
+/// Fee-token balance handed to the escrow so it has something to pre-fund with.
+const ESCROW_FUNDING: u256 = 500_000;
+const PREFUND: u128 = 2_000;
 const START_TS: u64 = 1_000;
 const EXPIRY: u64 = 2_000;
 
@@ -44,7 +48,14 @@ fn setup() -> (IXeniaEscrowDispatcher, ContractAddress) {
     let (token, _) = token_class.deploy(@token_args).unwrap();
 
     let escrow_class = declare("XeniaEscrow").unwrap().contract_class();
-    let (escrow, _) = escrow_class.deploy(@array![POOL]).unwrap();
+    // The mock doubles as the fee token; a claim in one token still owes its fee in another, so the
+    // contract keeps them separate.
+    let (escrow, _) = escrow_class.deploy(@array![POOL, token.into()]).unwrap();
+
+    // Give the escrow a balance so the pre-funding path has something to send.
+    start_cheat_caller_address(token, addr(SENDER));
+    IERC20Dispatcher { contract_address: token }.transfer(escrow, ESCROW_FUNDING);
+    stop_cheat_caller_address(token);
 
     (IXeniaEscrowDispatcher { contract_address: escrow }, token)
 }
@@ -385,4 +396,64 @@ fn a_claim_signature_cannot_be_replayed_as_a_refund() {
             s,
             'NOTE_ID',
         );
+}
+
+
+// ── Pre-funding
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn deposit_prefunds_the_named_address() {
+    let (escrow, token) = setup();
+    let link_key = KeyPairTrait::<felt252, felt252>::generate();
+    let commitment = compute_commitment(link_key.public_key);
+    let erc20 = IERC20Dispatcher { contract_address: token };
+    let before = erc20.balance_of(addr(CLAIMANT));
+    let mut spy = spy_events();
+
+    start_cheat_caller_address(escrow.contract_address, addr(POOL));
+    escrow
+        .privacy_invoke(
+            XeniaOperation::Deposit,
+            commitment,
+            token,
+            AMOUNT,
+            EXPIRY,
+            addr(SENDER),
+            addr(CLAIMANT), // reused on Deposit: who to pre-fund
+            0,
+            0,
+            PREFUND.into() // reused on Deposit: how much
+        );
+    stop_cheat_caller_address(escrow.contract_address);
+
+    assert!(erc20.balance_of(addr(CLAIMANT)) == before + PREFUND.into(), "prefund not received");
+
+    spy
+        .assert_emitted(
+            @array![
+                (
+                    escrow.contract_address,
+                    xenia::xenia_escrow::XeniaEscrow::Event::ClaimPrefunded(
+                        ClaimPrefunded { commitment, recipient: addr(CLAIMANT), amount: PREFUND },
+                    ),
+                ),
+            ],
+        );
+}
+
+/// Zero in either reused field means "no pre-funding", which is what every existing caller sends.
+#[test]
+fn deposit_without_prefunding_is_unchanged() {
+    let (escrow, token) = setup();
+    let erc20 = IERC20Dispatcher { contract_address: token };
+    let escrow_before = erc20.balance_of(escrow.contract_address);
+
+    let link_key = deposit(escrow, token);
+
+    assert!(
+        erc20.balance_of(escrow.contract_address) == escrow_before,
+        "escrow balance should not move",
+    );
+    assert!(!escrow.get_claim(compute_commitment(link_key.public_key)).claimed, "claimed");
 }

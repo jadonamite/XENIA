@@ -58,7 +58,19 @@ pub trait IXeniaEscrow<T> {
     /// contract. Returns an empty span; there is nothing to credit yet.
     /// * `commitment` — `poseidon(XENIA_COMMITMENT_TAG_V1, pk)`, computed off-chain.
     /// * `token`, `amount`, `expiry`, `refund_to` — the entry to store.
-    /// * `claimant`, `sig_r`, `sig_s`, `note_id` — ignored.
+    /// * `claimant` — **reused on Deposit** as the address to pre-fund, or zero for none.
+    /// * `note_id` — **reused on Deposit** as how much fee token to pre-fund it with.
+    /// * `sig_r`, `sig_s` — ignored.
+    ///
+    /// Pre-funding exists so a claimant can arrive with an empty wallet. The pool charges a fee in
+    /// STRK per transaction, and its balance invariant requires that fee to be matched by an inflow
+    /// inside the same transaction — which someone holding nothing cannot provide. Sending them
+    /// the fee ahead of time, out of the escrow rather than out of the sender's own address,
+    /// supplies it without putting a sender-to-recipient edge on chain.
+    ///
+    /// The two parameters are reused rather than appended because the pool deserialises calldata
+    /// positionally: appending would change the calldata length and break every existing caller.
+    /// Both were already passed as zero on Deposit, so zero keeps the old behaviour exactly.
     ///
     /// **Claim** — proves possession of the link key and credits the claimant's open note.
     /// * `commitment` — carries the link **public key** `pk`, not the stored key. The contract
@@ -105,6 +117,7 @@ pub mod errors {
     pub const NOT_REFUND_OWNER: felt252 = 'NOT_REFUND_OWNER';
     pub const BAD_SIGNATURE: felt252 = 'BAD_SIGNATURE';
     pub const CALLER_NOT_PRIVACY: felt252 = 'CALLER_NOT_PRIVACY';
+    pub const PREFUND_TOO_LARGE: felt252 = 'PREFUND_TOO_LARGE';
 }
 
 /// The storage key for a link key pair: `poseidon(TAG, pk)`.
@@ -145,6 +158,9 @@ pub mod XeniaEscrow {
     struct Storage {
         privacy_contract: ContractAddress,
         claims: Map<felt252, ClaimEntry>,
+        /// The token the pool charges its per-transaction fee in — STRK. Held separately from the
+        /// claim token because a claim denominated in USDC still owes its fee in STRK.
+        fee_token: ContractAddress,
     }
 
     /// Every state-changing path emits one of these. This is not polish: the sprint validator
@@ -154,6 +170,7 @@ pub mod XeniaEscrow {
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         ClaimCreated: ClaimCreated,
+        ClaimPrefunded: ClaimPrefunded,
         ClaimRedeemed: ClaimRedeemed,
         ClaimRefunded: ClaimRefunded,
     }
@@ -165,6 +182,17 @@ pub mod XeniaEscrow {
         pub token: ContractAddress,
         pub amount: u128,
         pub expiry: u64,
+    }
+
+    /// Emitted when a deposit pre-funds an address so the claimant can arrive with an empty wallet.
+    /// Separate from `ClaimCreated` so that event's shape stays exactly as the client already reads
+    /// it.
+    #[derive(Drop, starknet::Event)]
+    pub struct ClaimPrefunded {
+        #[key]
+        pub commitment: felt252,
+        pub recipient: ContractAddress,
+        pub amount: u128,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -184,8 +212,11 @@ pub mod XeniaEscrow {
     }
 
     #[constructor]
-    fn constructor(ref self: ContractState, privacy_contract: ContractAddress) {
+    fn constructor(
+        ref self: ContractState, privacy_contract: ContractAddress, fee_token: ContractAddress,
+    ) {
         self.privacy_contract.write(privacy_contract);
+        self.fee_token.write(fee_token);
     }
 
     #[abi(embed_v0)]
@@ -233,9 +264,27 @@ pub mod XeniaEscrow {
 
                     self.emit(ClaimCreated { commitment, token, amount, expiry });
 
+                    // Optional pre-funding. The sender's client withdraws the fee token to this
+                    // contract alongside the claim token, and we forward it to the address derived
+                    // from the link key, so the claimant can cover the pool fee without ever having
+                    // held anything.
+                    if claimant.is_non_zero() && note_id.is_non_zero() {
+                        let prefund: u128 = note_id.try_into().expect(errors::PREFUND_TOO_LARGE);
+                        IERC20Dispatcher { contract_address: self.fee_token.read() }
+                            .transfer(recipient: claimant, amount: prefund.into());
+                        self
+                            .emit(
+                                ClaimPrefunded { commitment, recipient: claimant, amount: prefund },
+                            );
+                    }
+
                     // The pool already moved the tokens here via its Withdraw action, so there is
                     // nothing for it to credit. An empty span is valid: "credit nothing".
-                    [].span()
+                    //
+                    // Bound to a name because a bare `[].span()` straight after an `if` block
+                    // parses as an index expression on that block.
+                    let nothing_to_credit: Span<OpenNoteDeposit> = [].span();
+                    nothing_to_credit
                 },
                 XeniaOperation::Claim => {
                     // `commitment` carries the link public key; the stored key is recomputed.

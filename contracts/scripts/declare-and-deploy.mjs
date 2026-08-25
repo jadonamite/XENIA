@@ -93,7 +93,9 @@ const main = async () => {
   console.log(`\n  class hash   ${classHash}`);
 
   const poolAddress = required('POOL_ADDRESS');
+  const feeToken = required('FEE_TOKEN');
   console.log(`  pool         ${normalise(poolAddress)}`);
+  console.log(`  fee token    ${normalise(feeToken)}`);
 
   if (dryRun) {
     console.log('\n  Dry run — nothing submitted.\n');
@@ -146,7 +148,7 @@ const main = async () => {
   console.log('\n  Deploying…');
   const deployed = await account.deployContract({
     classHash: declared.class_hash ?? classHash,
-    constructorCalldata: CallData.compile([poolAddress]),
+    constructorCalldata: CallData.compile([poolAddress, feeToken]),
   });
   console.log(`  deploy tx    ${deployed.transaction_hash}`);
   await provider.waitForTransaction(deployed.transaction_hash);
