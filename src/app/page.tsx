@@ -6,6 +6,7 @@ import { Paint } from '@/components/site/Paint';
 import { PillLink } from '@/components/site/Pill';
 import { Reveal } from '@/components/site/Reveal';
 import { Scatter } from '@/components/site/Scatter';
+import { BuiltOnOrbit } from '@/components/site/BuiltOnOrbit';
 import { WalletGrid } from '@/components/site/WalletGrid';
 import { WhyCards } from '@/components/site/WhyCards';
 
@@ -212,22 +213,8 @@ export default function Home() {
         </Reveal>
       </section>
 
-      {/* ---------- built on ---------- */}
-      <section className="page section-tight centered">
-        <p className="small" style={{ marginTop: 0 }}>
-          Built on
-        </p>
-        <div className="row" style={{ justifyContent: 'center', gap: 40, marginTop: 18 }}>
-          {BUILT_ON.map((name) => (
-            <span
-              key={name}
-              style={{ fontSize: 20, fontWeight: 500, color: 'var(--ink-3)', letterSpacing: '-0.01em' }}
-            >
-              {name}
-            </span>
-          ))}
-        </div>
-      </section>
+      {/* ---------- built on constellation orbit ---------- */}
+      <BuiltOnOrbit />
 
       {/* ---------- faq ---------- */}
       <section className="page section" id="faq">

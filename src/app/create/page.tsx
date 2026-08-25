@@ -11,6 +11,7 @@ import { saveClaim } from '@/lib/xenia/store';
 import { useWalletContext } from '@/lib/xenia/WalletContext';
 import { ClaimLinkCard } from '@/components/ClaimLinkCard';
 import { SlideToPay } from '@/components/app/SlideToPay';
+import { TokenSelect } from '@/components/ui/TokenSelect';
 
 const DAY = 24 * 60 * 60;
 const EXPIRY_PRESETS = [
@@ -31,9 +32,8 @@ export default function CreatePage() {
 
   const token = tokenBySymbol(symbol) ?? TOKENS[0];
 
-  // Estimated STRK price or calculation helper
   const parsedValue = parseFloat(amount || '0');
-  const usdValue = (parsedValue * (token.symbol === 'STRK' ? 0.45 : 2800)).toFixed(2);
+  const usdValue = (parsedValue * (token.symbol === 'STRK' ? 0.45 : token.symbol === 'ETH' ? 2800 : 1.0)).toFixed(2);
 
   async function create() {
     setError(null);
@@ -96,18 +96,18 @@ export default function CreatePage() {
     return (
       <main className="app" style={{ maxWidth: 480, padding: '40px 20px 80px' }}>
         <ClaimLinkCard link={link} />
-        <div style={{ marginTop: 20, textAlign: 'center' }}>
-          <p className="note">
+        <div style={{ marginTop: 24, textAlign: 'center' }}>
+          <p className="note" style={{ marginBottom: 16 }}>
             Locked {formatAmount(parseAmount(amount, token.decimals), token.decimals)} {token.symbol}.
-            You can monitor this link under <Link href="/claims">My Links</Link>.
+            You can monitor this link under <Link href="/claims" style={{ color: 'var(--accent)', fontWeight: 600 }}>My Links</Link>.
           </p>
           <button
             onClick={() => {
               setLink(null);
               setAmount('');
             }}
-            className="pill pill-ghost pill-plain"
-            style={{ marginTop: 12 }}
+            className="pill pill-plain"
+            style={{ padding: '8px 20px', fontSize: 13, fontWeight: 600 }}
           >
             Create Another Link
           </button>
@@ -127,14 +127,8 @@ export default function CreatePage() {
         </p>
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-        }}
-      >
-        {/* Section 1: "To" Card (matching screenshot) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Section 1: "To" Card */}
         <div>
           <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 8, display: 'block' }}>
             To
@@ -145,7 +139,7 @@ export default function CreatePage() {
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '14px 16px',
-              borderRadius: 16,
+              borderRadius: 18,
               background: 'var(--card-raised)',
               border: '1px solid var(--hairline)',
               boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
@@ -174,7 +168,7 @@ export default function CreatePage() {
                   Anyone with Claim Link
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-                  Bearer Instrument &bull; No Starknet address needed
+                  Bearer Instrument &bull; No Starknet address required
                 </div>
               </div>
             </div>
@@ -183,7 +177,7 @@ export default function CreatePage() {
           </div>
         </div>
 
-        {/* Section 2: "Amount" Card (matching screenshot) */}
+        {/* Section 2: "Amount" Card */}
         <div>
           <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 8, display: 'block' }}>
             Amount
@@ -197,7 +191,7 @@ export default function CreatePage() {
               boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
             }}
           >
-            {/* Top Row: Input & Token Selector */}
+            {/* Input & Token Selector */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <input
                 type="text"
@@ -215,62 +209,13 @@ export default function CreatePage() {
                   fontWeight: 600,
                   color: 'var(--ink)',
                   background: 'transparent',
-                  width: '60%',
+                  width: '55%',
                   outline: 'none',
                   letterSpacing: '-0.02em',
                 }}
               />
 
-              {/* Token Selector */}
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '6px 12px 6px 8px',
-                  borderRadius: 9999,
-                  background: 'var(--card)',
-                  border: '1px solid var(--hairline)',
-                  cursor: 'pointer',
-                }}
-              >
-                <div
-                  style={{
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    background: 'var(--accent)',
-                    color: '#fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}
-                >
-                  ⚡
-                </div>
-                <select
-                  value={symbol}
-                  onChange={(e) => setSymbol(e.target.value)}
-                  style={{
-                    background: 'transparent',
-                    border: 0,
-                    padding: 0,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: 'var(--ink)',
-                    cursor: 'pointer',
-                    outline: 'none',
-                  }}
-                >
-                  {TOKENS.map((t) => (
-                    <option key={t.symbol} value={t.symbol}>
-                      {t.symbol}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <TokenSelect value={symbol} onChange={setSymbol} />
             </div>
 
             {/* Bottom Row: USD Equivalent & Balance / MAX */}
@@ -298,14 +243,21 @@ export default function CreatePage() {
                   type="button"
                   onClick={() => setAmount('25')}
                   style={{
-                    padding: '2px 8px',
-                    borderRadius: 6,
-                    border: 0,
-                    background: 'rgba(19, 145, 226, 0.12)',
+                    padding: '3px 10px',
+                    borderRadius: 9999,
+                    border: '1px solid rgba(19, 145, 226, 0.25)',
+                    background: 'rgba(19, 145, 226, 0.1)',
                     color: 'var(--accent)',
                     fontSize: 11.5,
                     fontWeight: 600,
                     cursor: 'pointer',
+                    transition: 'all 160ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(19, 145, 226, 0.18)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(19, 145, 226, 0.1)';
                   }}
                 >
                   MAX
@@ -339,6 +291,7 @@ export default function CreatePage() {
                     cursor: 'pointer',
                     transition: 'all 160ms ease',
                     textAlign: 'center',
+                    boxShadow: isSelected ? '0 2px 8px rgba(19, 145, 226, 0.15)' : 'none',
                   }}
                 >
                   {preset.label}
