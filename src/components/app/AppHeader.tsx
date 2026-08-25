@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Wordmark } from '@/components/site/Wordmark';
+import { PillButton } from '@/components/site/Pill';
 import { useWalletContext } from '@/lib/xenia/WalletContext';
 import { useState } from 'react';
 
@@ -117,6 +118,8 @@ export function AppHeader() {
           <div style={{ position: 'relative' }}>
             {wallet.address ? (
               <button
+                type="button"
+                className="pill pill-plain"
                 onClick={() => setWalletDropdown(!walletDropdown)}
                 style={{
                   display: 'flex',
@@ -126,7 +129,7 @@ export function AppHeader() {
                   borderRadius: 9999,
                   background: 'var(--card-raised)',
                   border: '1px solid var(--hairline)',
-                  fontSize: 13.5,
+                  fontSize: 13,
                   fontWeight: 500,
                   color: 'var(--ink)',
                   cursor: 'pointer',
@@ -137,25 +140,12 @@ export function AppHeader() {
                 <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>▼</span>
               </button>
             ) : (
-              <button
+              <PillButton
+                disabled={wallet.connecting}
                 onClick={() => setWalletDropdown(!walletDropdown)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '7px 16px',
-                  borderRadius: 9999,
-                  background: 'var(--pill)',
-                  color: '#ffffff',
-                  border: 0,
-                  fontSize: 13.5,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'background 160ms ease',
-                }}
               >
                 {wallet.connecting ? 'Connecting…' : 'Connect Wallet'}
-              </button>
+              </PillButton>
             )}
 
             {/* Dropdown Menu */}

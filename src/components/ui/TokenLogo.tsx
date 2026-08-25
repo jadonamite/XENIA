@@ -1,6 +1,18 @@
 import React from 'react';
 
-export type TokenSymbol = 'STRK' | 'ETH' | 'USDC' | 'USDT' | 'STARKNET' | 'CAIRO' | 'NEXTJS' | 'VERCEL' | 'ARGENT' | 'BRAAVOS' | 'CARTRIDGE';
+export type TokenSymbol =
+  | 'STRK'
+  | 'STRK20'
+  | 'ETH'
+  | 'ETHEREUM'
+  | 'USDC'
+  | 'STARKNET'
+  | 'CAIRO'
+  | 'NEXTJS'
+  | 'VERCEL'
+  | 'ARGENT'
+  | 'BRAAVOS'
+  | 'CARTRIDGE';
 
 interface TokenLogoProps {
   symbol: string;
@@ -13,9 +25,51 @@ export function TokenLogo({ symbol, size = 24, className, style }: TokenLogoProp
   const norm = symbol.toUpperCase();
 
   switch (norm) {
-    case 'STRK':
-    case 'STARKNET':
     case 'STRK20':
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src="/STRK20.avif"
+          alt="STRK20"
+          width={size}
+          height={size}
+          className={className}
+          style={{
+            width: size,
+            height: size,
+            objectFit: 'contain',
+            borderRadius: '50%',
+            flexShrink: 0,
+            ...style,
+          }}
+          onError={(e) => {
+            // Fallback to vector Starknet star if avif is not rendered
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      );
+
+    case 'STRK':
+      return (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src="/STRK20.avif"
+          alt="STRK"
+          width={size}
+          height={size}
+          className={className}
+          style={{
+            width: size,
+            height: size,
+            objectFit: 'contain',
+            borderRadius: '50%',
+            flexShrink: 0,
+            ...style,
+          }}
+        />
+      );
+
+    case 'STARKNET':
       return (
         <svg
           width={size}
