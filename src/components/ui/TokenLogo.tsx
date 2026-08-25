@@ -23,18 +23,21 @@ interface TokenLogoProps {
 
 const LOGO_MAP: Record<string, { src: string; alt: string }> = {
   STRK20: { src: '/logos/strk20.png', alt: 'STRK20' },
-  STRK: { src: '/logos/starknet.svg', alt: 'STRK' },
-  STARKNET: { src: '/logos/starknet.svg', alt: 'Starknet' },
+  STRK: { src: '/logos/strk.png', alt: 'STRK' },
+  STARKNET: { src: '/logos/starknet.png', alt: 'Starknet' },
   ETH: { src: '/logos/eth.svg', alt: 'Ethereum' },
   ETHEREUM: { src: '/logos/eth.svg', alt: 'Ethereum' },
-  USDC: { src: '/logos/usdc.svg', alt: 'USDC' },
-  CAIRO: { src: '/logos/cairo.svg', alt: 'Cairo' },
+  USDC: { src: '/logos/usdc.png', alt: 'USDC' },
+  CAIRO: { src: '/logos/cairo.png', alt: 'Cairo' },
   ARGENT: { src: '/logos/argent.svg', alt: 'Argent X' },
   BRAAVOS: { src: '/logos/braavos.svg', alt: 'Braavos' },
-  CARTRIDGE: { src: '/logos/cartridge.svg', alt: 'Cartridge' },
+  CARTRIDGE: { src: '/logos/cartridge.svg', alt: 'Cartridge Controller' },
   NEXTJS: { src: '/logos/nextjs.svg', alt: 'Next.js' },
   VERCEL: { src: '/logos/vercel.svg', alt: 'Vercel' },
 };
+
+// Only the coin marks are drawn as discs. Rounding the rest would crop the wordmark logos.
+const ROUND = new Set(['STRK', 'ETH', 'ETHEREUM', 'USDC']);
 
 export function TokenLogo({ symbol, size = 24, className, style }: TokenLogoProps) {
   const norm = symbol.toUpperCase();
@@ -55,7 +58,7 @@ export function TokenLogo({ symbol, size = 24, className, style }: TokenLogoProp
           objectFit: 'contain',
           display: 'inline-block',
           verticalAlign: 'middle',
-          borderRadius: norm === 'STRK20' ? 6 : '50%',
+          borderRadius: ROUND.has(norm) ? '50%' : 6,
           flexShrink: 0,
           ...style,
         }}

@@ -15,25 +15,25 @@ interface OrbitNode {
 }
 
 const NODES: OrbitNode[] = [
-  { name: 'Starknet', symbol: 'STARKNET', category: 'L2 Validity Rollup', glowColor: 'rgba(236, 121, 107, 0.65)', angle: 270 },
-  { name: 'Cairo', symbol: 'CAIRO', category: 'Provable Programming', glowColor: 'rgba(248, 106, 59, 0.65)', angle: 315 },
-  { name: 'STRK20', symbol: 'STRK20', category: 'Private Token Standard', glowColor: 'rgba(19, 145, 226, 0.65)', angle: 0 },
-  { name: 'Argent X', symbol: 'ARGENT', category: 'Account Abstraction', glowColor: 'rgba(255, 92, 0, 0.65)', angle: 45 },
-  { name: 'Braavos', symbol: 'BRAAVOS', category: 'Hardware Security', glowColor: 'rgba(94, 123, 249, 0.65)', angle: 90 },
-  { name: 'Cartridge', symbol: 'CARTRIDGE', category: 'Passkey Controller', glowColor: 'rgba(254, 224, 0, 0.7)', angle: 135 },
-  { name: 'Next.js', symbol: 'NEXTJS', category: 'Zero-Leak App Router', glowColor: 'rgba(140, 80, 255, 0.55)', angle: 180 },
-  { name: 'Vercel', symbol: 'VERCEL', category: 'Edge Distribution', glowColor: 'rgba(30, 30, 30, 0.45)', angle: 225 },
+  { name: 'Starknet', symbol: 'STARKNET', category: 'L2 Validity Rollup', glowColor: 'rgba(236, 121, 107, 0.7)', angle: 270 },
+  { name: 'Cairo', symbol: 'CAIRO', category: 'Provable Programming', glowColor: 'rgba(248, 106, 59, 0.7)', angle: 315 },
+  { name: 'STRK20', symbol: 'STRK20', category: 'Private Token Standard', glowColor: 'rgba(19, 145, 226, 0.7)', angle: 0 },
+  { name: 'Argent X', symbol: 'ARGENT', category: 'Account Abstraction', glowColor: 'rgba(255, 92, 0, 0.7)', angle: 45 },
+  { name: 'Braavos', symbol: 'BRAAVOS', category: 'Hardware Security', glowColor: 'rgba(94, 123, 249, 0.7)', angle: 90 },
+  { name: 'Cartridge', symbol: 'CARTRIDGE', category: 'Passkey Controller', glowColor: 'rgba(254, 224, 0, 0.75)', angle: 135 },
+  { name: 'Next.js', symbol: 'NEXTJS', category: 'Zero-Leak App Router', glowColor: 'rgba(140, 80, 255, 0.6)', angle: 180 },
+  { name: 'Vercel', symbol: 'VERCEL', category: 'Edge Distribution', glowColor: 'rgba(40, 40, 40, 0.5)', angle: 225 },
 ];
 
 export function BuiltOnOrbit() {
   const [hoveredNode, setHoveredNode] = useState<OrbitNode | null>(null);
 
-  const radius = 200; // Orbit radius in pixels
+  const radius = 230; // Expanded orbit radius in pixels
 
   return (
-    <section className="page section-tight centered" style={{ overflow: 'visible', paddingBlock: 56 }}>
+    <section className="page section-tight centered" style={{ overflow: 'visible', paddingBlock: 60 }}>
       <Reveal>
-        <div style={{ marginBottom: 32 }}>
+        <div style={{ marginBottom: 36 }}>
           <span className="eyebrow">Integrations &amp; Ecosystem</span>
           <h2 className="head" style={{ maxWidth: '20ch', marginInline: 'auto' }}>
             Built on the Starknet frontier.
@@ -71,9 +71,9 @@ export function BuiltOnOrbit() {
         style={{
           position: 'relative',
           width: '100%',
-          maxWidth: 520,
-          height: 480,
-          margin: '20px auto 0',
+          maxWidth: 600,
+          height: 540,
+          margin: '24px auto 0',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -84,12 +84,12 @@ export function BuiltOnOrbit() {
           className="orbit-aura"
           style={{
             position: 'absolute',
-            width: 320,
-            height: 320,
+            width: 360,
+            height: 360,
             borderRadius: '50%',
             background:
-              'radial-gradient(circle, rgba(255, 238, 217, 0.8) 0%, rgba(255, 206, 225, 0.55) 25%, rgba(180, 230, 245, 0.45) 50%, rgba(195, 210, 250, 0.4) 75%, transparent 95%)',
-            filter: 'blur(32px)',
+              'radial-gradient(circle, rgba(255, 238, 217, 0.85) 0%, rgba(255, 206, 225, 0.6) 25%, rgba(180, 230, 245, 0.5) 50%, rgba(195, 210, 250, 0.45) 75%, transparent 95%)',
+            filter: 'blur(36px)',
             pointerEvents: 'none',
             zIndex: 0,
           }}
@@ -99,8 +99,8 @@ export function BuiltOnOrbit() {
         <div
           style={{
             position: 'absolute',
-            width: 210,
-            height: 210,
+            width: 240,
+            height: 240,
             borderRadius: '50%',
             border: '1px solid rgba(0, 0, 0, 0.04)',
             pointerEvents: 'none',
@@ -109,8 +109,8 @@ export function BuiltOnOrbit() {
         <div
           style={{
             position: 'absolute',
-            width: 290,
-            height: 290,
+            width: 330,
+            height: 330,
             borderRadius: '50%',
             border: '1px solid rgba(0, 0, 0, 0.04)',
             pointerEvents: 'none',
@@ -129,24 +129,24 @@ export function BuiltOnOrbit() {
           }}
         />
 
-        {/* Central Hub with Xenia Logo */}
+        {/* Central Hub with Big Xenia Logo & Deep 3D Drop Shadow */}
         <div
           style={{
             position: 'relative',
-            width: 92,
-            height: 92,
-            borderRadius: 26,
+            width: 118,
+            height: 118,
+            borderRadius: 32,
             background: '#ffffff',
-            border: '1px solid rgba(0, 0, 0, 0.06)',
+            border: '1px solid rgba(0, 0, 0, 0.05)',
             boxShadow:
-              '0 24px 48px -6px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.04)',
+              '0 32px 64px -12px rgba(0, 0, 0, 0.20), 0 16px 32px -8px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.03), inset 0 2px 0 rgba(255, 255, 255, 0.9)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 10,
           }}
         >
-          <Mark size={48} id="orbit-center-mark" />
+          <Mark size={64} id="orbit-center-mark" />
         </div>
 
         {/* Revolving Orbit Ring Track */}
@@ -187,21 +187,21 @@ export function BuiltOnOrbit() {
                   className="orbit-node-inner"
                   style={{
                     position: 'relative',
-                    width: 64,
-                    height: 64,
+                    width: 68,
+                    height: 68,
                   }}
                 >
                   {/* Colored ambient glow drop shadow under each tile */}
                   <div
                     style={{
                       position: 'absolute',
-                      inset: -8,
-                      borderRadius: 24,
+                      inset: -10,
+                      borderRadius: 26,
                       background: node.glowColor,
-                      filter: 'blur(14px)',
-                      opacity: isHovered ? 1 : 0.75,
+                      filter: 'blur(16px)',
+                      opacity: isHovered ? 1 : 0.8,
                       transition: 'all 220ms ease',
-                      transform: isHovered ? 'scale(1.3)' : 'scale(1)',
+                      transform: isHovered ? 'scale(1.35)' : 'scale(1)',
                       zIndex: -1,
                     }}
                   />
@@ -211,21 +211,21 @@ export function BuiltOnOrbit() {
                     style={{
                       width: '100%',
                       height: '100%',
-                      borderRadius: 20,
+                      borderRadius: 22,
                       background: '#ffffff',
                       border: '1px solid rgba(0, 0, 0, 0.05)',
                       boxShadow: isHovered
-                        ? '0 18px 40px rgba(0, 0, 0, 0.16)'
-                        : '0 10px 24px -2px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03)',
+                        ? '0 20px 48px rgba(0, 0, 0, 0.18)'
+                        : '0 12px 28px -3px rgba(0, 0, 0, 0.09), 0 3px 8px rgba(0, 0, 0, 0.03)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       transform: isHovered ? 'scale(1.15) translateY(-3px)' : 'none',
                       transition: 'all 220ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-                      padding: 12,
+                      padding: 14,
                     }}
                   >
-                    <TokenLogo symbol={node.symbol} size={32} />
+                    <TokenLogo symbol={node.symbol} size={34} />
                   </div>
 
                   {/* Tooltip on hover */}
@@ -233,14 +233,14 @@ export function BuiltOnOrbit() {
                     <div
                       style={{
                         position: 'absolute',
-                        bottom: 'calc(100% + 12px)',
+                        bottom: 'calc(100% + 14px)',
                         left: '50%',
                         transform: 'translateX(-50%)',
-                        padding: '6px 14px',
+                        padding: '7px 16px',
                         borderRadius: 12,
                         background: '#ffffff',
                         border: '1px solid var(--hairline)',
-                        boxShadow: '0 16px 36px rgba(0, 0, 0, 0.14)',
+                        boxShadow: '0 18px 40px rgba(0, 0, 0, 0.15)',
                         whiteSpace: 'nowrap',
                         pointerEvents: 'none',
                         animation: 'fadeIn 150ms ease',
@@ -266,7 +266,7 @@ export function BuiltOnOrbit() {
       {/* Dynamic Status Indicator */}
       <div
         style={{
-          marginTop: 20,
+          marginTop: 24,
           minHeight: 28,
           fontSize: 13.5,
           color: hoveredNode ? 'var(--accent)' : 'var(--ink-2)',
