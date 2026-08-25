@@ -11,7 +11,8 @@
  *   node declare-and-deploy.mjs --dry-run     # compute the class hash, submit nothing
  *   node declare-and-deploy.mjs               # declare + deploy
  *
- * Environment (a .env is not read — export these, or prefix the command):
+ * Credentials live in `.env` (gitignored, never committed). Copy `.env.example` and fill it in;
+ * the npm scripts load it with Node's --env-file. Variables:
  *
  *   STARKNET_RPC_URL       RPC endpoint. Mainnet: https://rpc.starknet.lava.build
  *   DEPLOYER_ADDRESS       Account that pays for the declare and deploy
