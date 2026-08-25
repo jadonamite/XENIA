@@ -117,23 +117,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ---------- built on ---------- */}
-      <section className="page section-tight centered">
-        <p className="small" style={{ marginTop: 0 }}>
-          Built on
-        </p>
-        <div className="row" style={{ justifyContent: 'center', gap: 40, marginTop: 18 }}>
-          {BUILT_ON.map((name) => (
-            <span
-              key={name}
-              style={{ fontSize: 20, fontWeight: 500, color: 'var(--ink-3)', letterSpacing: '-0.01em' }}
-            >
-              {name}
-            </span>
-          ))}
-        </div>
-      </section>
-
       {/* ---------- why ---------- */}
       <section className="page section" id="why">
         <Reveal>
@@ -227,6 +210,23 @@ export default function Home() {
         <Reveal>
           <HowItWorks />
         </Reveal>
+      </section>
+
+      {/* ---------- built on ---------- */}
+      <section className="page section-tight centered">
+        <p className="small" style={{ marginTop: 0 }}>
+          Built on
+        </p>
+        <div className="row" style={{ justifyContent: 'center', gap: 40, marginTop: 18 }}>
+          {BUILT_ON.map((name) => (
+            <span
+              key={name}
+              style={{ fontSize: 20, fontWeight: 500, color: 'var(--ink-3)', letterSpacing: '-0.01em' }}
+            >
+              {name}
+            </span>
+          ))}
+        </div>
       </section>
 
       {/* ---------- faq ---------- */}

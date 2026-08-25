@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
-import { Nav } from '@/components/site/Nav';
-import { Footer } from '@/components/site/Footer';
+import { SiteShell } from '@/components/site/SiteShell';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -29,9 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="icon" href="/Xenia.png" type="image/png" />
       </head>
       <body>
-        <Nav />
-        {children}
-        <Footer />
+        <SiteShell>{children}</SiteShell>
       </body>
     </html>
   );

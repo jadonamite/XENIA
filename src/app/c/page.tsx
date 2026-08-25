@@ -7,7 +7,7 @@ import { ESCROW_ADDRESS, TOKENS } from '@/lib/xenia/config';
 import { signClaim, type LinkKey } from '@/lib/xenia/crypto';
 import { readClaimFromLocation } from '@/lib/xenia/link';
 import { readClaim, statusOf, type ClaimEntry } from '@/lib/xenia/escrow';
-import { useWallet } from '@/lib/xenia/useWallet';
+import { useWalletContext } from '@/lib/xenia/WalletContext';
 import { WalletBar } from '@/components/WalletBar';
 import { PillButton } from '@/components/site/Pill';
 
@@ -17,7 +17,7 @@ const tokenLabel = (address: string) => {
 };
 
 export default function ClaimPage() {
-  const wallet = useWallet();
+  const wallet = useWalletContext();
   const [key, setKey] = useState<LinkKey | null>(null);
   const [ready, setReady] = useState(false);
   const [entry, setEntry] = useState<ClaimEntry | null>(null);
