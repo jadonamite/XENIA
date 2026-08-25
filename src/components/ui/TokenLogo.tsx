@@ -22,7 +22,7 @@ interface TokenLogoProps {
 }
 
 const LOGO_MAP: Record<string, { src: string; alt: string }> = {
-  STRK20: { src: '/logos/strk20.png', alt: 'STRK20' },
+  STRK20: { src: '/logos/strk20-mark.png', alt: 'STRK20' },
   STRK: { src: '/logos/strk.png', alt: 'STRK' },
   STARKNET: { src: '/logos/starknet.png', alt: 'Starknet' },
   ETH: { src: '/logos/eth.svg', alt: 'Ethereum' },
