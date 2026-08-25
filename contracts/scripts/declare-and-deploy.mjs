@@ -24,7 +24,31 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Account, CallData, RpcProvider, constants, hash } from 'starknet';
+import { Account, CallData, RpcProvider, Signer, constants, ec, hash } from 'starknet';
+
+/**
+ * Signer for Argent / Ready accounts from v0.4 onwards.
+ *
+ * Those accounts validate against `Array<SignerSignature>` rather than a bare `[r, s]`, because
+ * they support several signer types (Starknet key, secp256k1, WebAuthn…). starknet.js's default
+ * `Signer` emits two felts, and the account rejects it with `argent/invalid-signature-length`.
+ *
+ * For a single Starknet-key owner the expected encoding is five felts:
+ *
+ *   [ 1, 0, pubkey, r, s ]
+ *     │  │
+ *     │  └── enum variant 0 = Starknet
+ *     └───── array length: one SignerSignature
+ *
+ * Every signing path in `Signer` funnels through `signRaw`, so overriding it alone covers
+ * declare, deploy and invoke.
+ */
+class ArgentV4Signer extends Signer {
+  async signRaw(msgHash) {
+    const { r, s } = ec.starkCurve.sign(msgHash, this.pk);
+    return ['0x1', '0x0', ec.starkCurve.getStarkKey(this.pk), `0x${r.toString(16)}`, `0x${s.toString(16)}`];
+  }
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TARGET = resolve(HERE, '..', 'target', 'dev');
@@ -95,11 +119,18 @@ const main = async () => {
     }
   }
 
-  const account = new Account(
+  // starknet.js v10 takes a single options object. The older positional form
+  // `new Account(provider, address, key)` silently binds `provider` to `options` and then dies on
+  // `address.toLowerCase()`, which reads like a bug in your own code.
+  const key = required('DEPLOYER_PRIVATE_KEY');
+  const accountType = (process.env.ACCOUNT_TYPE ?? 'standard').toLowerCase();
+  console.log(`  account type ${accountType}`);
+
+  const account = new Account({
     provider,
-    required('DEPLOYER_ADDRESS'),
-    required('DEPLOYER_PRIVATE_KEY'),
-  );
+    address: required('DEPLOYER_ADDRESS'),
+    signer: accountType === 'argent' ? new ArgentV4Signer(key) : key,
+  });
 
   console.log('\n  Declaring…');
   // `declareIfNot` is a no-op when the class is already on-chain, which makes a re-run after a
