@@ -27,9 +27,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The lock lives in contracts/, not at the repo root, so the action's cache cannot find it
+      # by default and reports "failed to find Scarb.lock" on every run.
       - uses: software-mansion/setup-scarb@v1
         with:
           scarb-version: '2.20.1'
+          scarb-lock: contracts/Scarb.lock
 
       - uses: foundry-rs/setup-snfoundry@v3
         with:
@@ -41,8 +44,17 @@ jobs:
       - name: Format
         run: scarb fmt --check
 
+      # A commit touching only markdown once failed here while the identical contract code passed
+      # on the commit before it — a registry fetch hiccup, not a compile error. Retry rather than
+      # letting the network decide whether the suite runs.
       - name: Build
-        run: scarb build
+        run: |
+          for attempt in 1 2 3; do
+            if scarb build; then exit 0; fi
+            echo "::warning::scarb build failed on attempt $attempt, retrying"
+            sleep 10
+          done
+          exit 1
 
       # `test_contracts` gates the mock ERC-20 the suite deploys. Without it the mock is not
       # compiled and every test fails at `declare("MockERC20")`.
