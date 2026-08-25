@@ -84,3 +84,62 @@ Items 1–3 are measured from mainnet, not inferred from documentation. The samp
 treat the *counts* as indicative. The *existence* proofs — registration bundles, the pool
 reimburses the fee, `apply_actions` is directly callable — need only one example each, and each
 has several.
+
+---
+
+# 4. A zero-balance claimant cannot pay the fee in a pure receive — from the pool's own rules
+
+The remaining question split into a wallet half (does Ready emit phase 0 for a pure receive?) and
+a protocol half (can a zero-balance account pay the fee at all?). The protocol half is decidable
+without a browser, and the answer is no.
+
+**The balance invariant.** Every pool transaction tracks a per-token running balance across its
+client actions:
+
+| Action | Effect |
+|---|---|
+| `deposit` | add |
+| `use_note` (spend an existing note) | add |
+| `withdraw` | subtract |
+| `create_enc_note` / `create_open_note` | subtract |
+
+`subtract_balance` uses `checked_sub` and panics `NEGATIVE_INTERMEDIATE_BALANCE`; at the end
+`assert_valid` requires **every token to net exactly zero**, or `FINAL_BALANCE_MUST_BE_ZERO`.
+
+The mainnet transaction traced above fits exactly: `+8` deposit, `−2` note, `−6` fee = 0.
+
+**`invoke_external` has no balance effect.** It only emits `ServerAction::Invoke`; the escrow's
+returned `OpenNoteDeposit` is applied server-side, outside this accounting.
+
+So Xenia's claim, for a first-time user, is:
+
+```
+create_open_note (zero-value)   −0
+invoke_external                  no effect
+withdraw 6 STRK   (the fee)     −6
+                                ────
+inflows                           0     →  checked_sub(0, 6) panics
+```
+
+**The fee withdrawal has nothing to balance against.** This is not Ready being incomplete — the
+pool would reject the transaction whatever wallet built it.
+
+## What that leaves
+
+Two ways a claim can work, and only two:
+
+1. **Sponsorship.** If the relayer absorbs the fee without reclaiming it, there is no `withdraw`
+   action at all and the invariant holds trivially (0 = 0). Support's phrasing — "unless the flow
+   is sponsored" — implies this exists. Whether it can be turned on for our claim is now **the
+   single question worth asking.**
+2. **Bundle a deposit** of at least the fee into the claim. That supplies the inflow, and it is the
+   exact shape already running on mainnet (`ViewingKeySet + Deposit + … + Withdrawal`). Cost: the
+   claimant needs ~6 STRK of *public* STRK, which weakens "arrives with nothing" but is far more
+   tractable than needing private balance.
+
+Option 2 is the fallback we can build without anyone's permission. Option 1 is strictly better if
+available.
+
+**Confidence:** derived from the pool's source and consistent with every mainnet transaction
+observed. What is *not* established is whether sponsorship can suppress the fee withdrawal for our
+flow — that is a policy question, not a code one.
