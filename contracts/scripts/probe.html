@@ -129,9 +129,30 @@ function isStarknetCapable(w) {
   return Object.keys(w.obj?.features ?? {}).some((f) => f.startsWith('starknet:'));
 }
 
+/**
+ * `Object.keys(window)` returns only *enumerable* properties, and wallet extensions routinely
+ * install themselves with `Object.defineProperty(..., { enumerable: false })`. Enumerating that way
+ * reports "no wallet" while the wallet is sitting right there. Use getOwnPropertyNames, and also
+ * probe the known names directly in case the property is on a prototype or a proxy.
+ */
+const KNOWN_KEYS = [
+  'starknet', 'starknet_argentX', 'starknet_ready', 'starknet_braavos', 'starknet_okxwallet',
+  'starknet_keplr', 'starknet_metamask', 'starknet_fordefi', 'starknet_bitkeep',
+];
+
+function legacyKeys() {
+  const seen = new Set();
+  try {
+    for (const k of Object.getOwnPropertyNames(window)) if (k.startsWith('starknet')) seen.add(k);
+  } catch { /* some environments restrict this */ }
+  for (const k of KNOWN_KEYS) {
+    try { if (window[k]) seen.add(k); } catch { /* ignore a throwing getter */ }
+  }
+  return [...seen];
+}
+
 function findWallets() {
-  const legacy = Object.keys(window)
-    .filter((k) => k.startsWith('starknet'))
+  const legacy = legacyKeys()
     .map((k) => ({ key: k, obj: window[k], kind: 'legacy' }))
     .filter((w) => w.obj && typeof w.obj === 'object');
   const standard = standardWallets.map((w) => ({
@@ -175,7 +196,8 @@ function refreshDetection() {
   $('diag').innerHTML = `
     <dl class="kv">
       <dt>page origin</dt><dd>${esc(location.origin || 'file://')}</dd>
-      <dt>legacy objects</dt><dd>${esc(Object.keys(window).filter((k) => k.startsWith('starknet')).join(', ') || 'none')}</dd>
+      <dt>legacy (enumerable)</dt><dd>${esc(Object.keys(window).filter((k) => k.startsWith('starknet')).join(', ') || 'none')}</dd>
+      <dt>legacy (all props)</dt><dd>${esc(legacyKeys().join(', ') || 'none')}</dd>
       <dt>wallet-standard</dt><dd>${esc(standardWallets.map((w) => w.name).join(', ') || 'none registered')}</dd>
       <dt>features</dt><dd>${esc(standardWallets.map((w) => `${w.name}: ${Object.keys(w.features || {}).join(' ')}`).join(' | ') || '—')}</dd>
       <dt>starknet-capable</dt><dd>${esc(findWallets().filter((w) => w.starknet).map((w) => w.key).join(', ') || 'none')}</dd>
