@@ -1,6 +1,24 @@
 # Deployments
 
-## Sepolia — 2026-08-25
+## Sepolia — 2026-08-26 (current)
+
+Redeployed after the constructor gained a fee token and Deposit gained optional pre-funding.
+
+| | |
+|---|---|
+| `XeniaEscrow` | `0x7d01c97a95ddc117ac63be7a6ab4b042d87d8a70c1cadbdb1f4c1f88b68094e` |
+| Class hash | `0x65651460529d1b5d02ee24e7038dfa47df038cd5b7788aebd65fd5c2e07dfc5` |
+| Pool | `0x0254a6b2997ef52e9f830ce1f543f6b29768295e8d17e2267d672c552cfe0d91` |
+| Fee token (STRK) | `0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d` |
+| Deploy tx | `0x27a586c3005752b3c35edce8a0c9c6438eb587e92aadfd5d9eeef800e9d5f57` |
+
+Verified live: `privacy_contract()` returns the Sepolia pool, `get_claim` on an unknown commitment
+returns the all-zero sentinel, and the deployed ABI carries all four events including
+`ClaimPrefunded`.
+
+**Client should point at this address**, not the one below.
+
+## Sepolia — 2026-08-25 (superseded)
 
 Rehearsal for mainnet. Everything below was verified on-chain after deploying, not just assumed
 from a script exiting zero.
