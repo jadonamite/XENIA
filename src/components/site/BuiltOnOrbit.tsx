@@ -79,52 +79,51 @@ export function BuiltOnOrbit() {
           justifyContent: 'center',
         }}
       >
-        {/* Iridescent Multi-Color Concentric Halo Disk */}
+        {/*
+         * The bloom is a set of off-centre colour blobs inside one circle, not concentric rings.
+         * Concentric stops average out to flat grey; separated hues keep the iridescence readable.
+         */}
         <div
           className="orbit-aura"
           style={{
             position: 'absolute',
-            width: 360,
-            height: 360,
+            width: 366,
+            height: 366,
+            borderRadius: '50%',
+            background: [
+              'radial-gradient(circle at 66% 20%, rgba(146, 235, 196, 0.55) 0%, transparent 58%)',
+              'radial-gradient(circle at 88% 58%, rgba(158, 205, 250, 0.55) 0%, transparent 60%)',
+              'radial-gradient(circle at 28% 76%, rgba(255, 196, 216, 0.55) 0%, transparent 60%)',
+              'radial-gradient(circle at 18% 34%, rgba(206, 194, 246, 0.5) 0%, transparent 58%)',
+              'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.85) 0%, rgba(255, 255, 255, 0) 62%)',
+            ].join(', '),
+            filter: 'blur(42px)',
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            width: 196,
+            height: 196,
             borderRadius: '50%',
             background:
-              'radial-gradient(circle, rgba(255, 238, 217, 0.85) 0%, rgba(255, 206, 225, 0.6) 25%, rgba(180, 230, 245, 0.5) 50%, rgba(195, 210, 250, 0.45) 75%, transparent 95%)',
-            filter: 'blur(36px)',
+              'radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.35) 55%, transparent 100%)',
+            filter: 'blur(28px)',
             pointerEvents: 'none',
             zIndex: 0,
           }}
         />
 
-        {/* Concentric Decorative Halo Circles */}
-        <div
-          style={{
-            position: 'absolute',
-            width: 240,
-            height: 240,
-            borderRadius: '50%',
-            border: '1px solid rgba(0, 0, 0, 0.04)',
-            pointerEvents: 'none',
-          }}
-        />
-        <div
-          style={{
-            position: 'absolute',
-            width: 330,
-            height: 330,
-            borderRadius: '50%',
-            border: '1px solid rgba(0, 0, 0, 0.04)',
-            pointerEvents: 'none',
-          }}
-        />
-
-        {/* Thin Orbit Path Line */}
+        {/* One ring, at the orbit radius. The extra inner circles read as clutter against the bloom. */}
         <div
           style={{
             position: 'absolute',
             width: radius * 2,
             height: radius * 2,
             borderRadius: '50%',
-            border: '1px solid rgba(0, 0, 0, 0.06)',
+            border: '1px solid rgba(0, 0, 0, 0.07)',
             pointerEvents: 'none',
           }}
         />
@@ -133,9 +132,9 @@ export function BuiltOnOrbit() {
         <div
           style={{
             position: 'relative',
-            width: 118,
-            height: 118,
-            borderRadius: 32,
+            width: 104,
+            height: 104,
+            borderRadius: 28,
             background: '#ffffff',
             border: '1px solid rgba(0, 0, 0, 0.05)',
             boxShadow:
@@ -146,7 +145,7 @@ export function BuiltOnOrbit() {
             zIndex: 10,
           }}
         >
-          <Mark size={64} id="orbit-center-mark" />
+          <Mark size={58} id="orbit-center-mark" />
         </div>
 
         {/* Revolving Orbit Ring Track */}
@@ -187,19 +186,19 @@ export function BuiltOnOrbit() {
                   className="orbit-node-inner"
                   style={{
                     position: 'relative',
-                    width: 68,
-                    height: 68,
+                    width: 58,
+                    height: 58,
                   }}
                 >
                   {/* Colored ambient glow drop shadow under each tile */}
                   <div
                     style={{
                       position: 'absolute',
-                      inset: -10,
-                      borderRadius: 26,
+                      inset: -8,
+                      borderRadius: 22,
                       background: node.glowColor,
-                      filter: 'blur(16px)',
-                      opacity: isHovered ? 1 : 0.8,
+                      filter: 'blur(18px)',
+                      opacity: isHovered ? 0.8 : 0.34,
                       transition: 'all 220ms ease',
                       transform: isHovered ? 'scale(1.35)' : 'scale(1)',
                       zIndex: -1,
@@ -211,7 +210,7 @@ export function BuiltOnOrbit() {
                     style={{
                       width: '100%',
                       height: '100%',
-                      borderRadius: 22,
+                      borderRadius: 18,
                       background: '#ffffff',
                       border: '1px solid rgba(0, 0, 0, 0.05)',
                       boxShadow: isHovered
@@ -222,7 +221,7 @@ export function BuiltOnOrbit() {
                       justifyContent: 'center',
                       transform: isHovered ? 'scale(1.15) translateY(-3px)' : 'none',
                       transition: 'all 220ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-                      padding: 14,
+                      padding: 11,
                     }}
                   >
                     <TokenLogo symbol={node.symbol} size={34} />
