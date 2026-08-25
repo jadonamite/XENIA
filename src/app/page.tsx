@@ -1,10 +1,12 @@
 import { Accordion } from '@/components/site/Accordion';
 import { AppMock } from '@/components/site/AppMock';
+import { DelegationSync } from '@/components/site/DelegationSync';
 import { HowItWorks } from '@/components/site/HowItWorks';
 import { Paint } from '@/components/site/Paint';
 import { PillLink } from '@/components/site/Pill';
 import { Reveal } from '@/components/site/Reveal';
 import { Scatter } from '@/components/site/Scatter';
+import { WalletGrid } from '@/components/site/WalletGrid';
 
 const BUILT_ON = ['Starknet', 'STRK20', 'Cairo', 'Next.js', 'Vercel'];
 
@@ -202,26 +204,9 @@ export default function Home() {
           </div>
         </Reveal>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
-            gap: 56,
-            alignItems: 'center',
-            marginTop: 48,
-          }}
-          className="delegation"
-        >
-          <Reveal>
-            <Accordion items={DELEGATION} />
-          </Reveal>
-          <Reveal delay={80}>
-            <div className="panel-paint" style={{ padding: '36px 28px' }}>
-              <Paint variant="tide" id="deleg" />
-              <AppMock variant="link" />
-            </div>
-          </Reveal>
-        </div>
+        <Reveal>
+          <DelegationSync />
+        </Reveal>
       </section>
 
       {/* ---------- what leaks ---------- */}
@@ -302,6 +287,9 @@ export default function Home() {
           </Reveal>
         </div>
       </section>
+
+      {/* ---------- wallet support ecosystem ---------- */}
+      <WalletGrid />
 
       {/* ---------- closing ---------- */}
       <section className="page" style={{ paddingBottom: 'var(--section)' }}>
