@@ -22,7 +22,9 @@ import { fileURLToPath } from 'node:url';
 import { Account, RpcProvider, ec, hash, stark } from 'starknet';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const ENV = resolve(HERE, '.env');
+/** Which env file to write into. Mainnet and Sepolia keep separate ones so a deploy cannot
+ * pick up the wrong network's account by accident. */
+const ENV = resolve(HERE, process.env.ENV_FILE ?? '.env');
 
 /** OpenZeppelin account, already declared on both Sepolia and mainnet. */
 const OZ_CLASS_HASH = '0x061dac032f228abef9c6626f995015233097ae253a7f72d68552db02f2971b8f';

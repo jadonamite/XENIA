@@ -1,5 +1,27 @@
 # Deployments
 
+## Mainnet — 2026-08-26
+
+| | |
+|---|---|
+| `XeniaEscrow` | `0x257082062a074eb79575b859c9b3aadd40a986501223928121b5a1f56627095` |
+| Class hash | `0x65651460529d1b5d02ee24e7038dfa47df038cd5b7788aebd65fd5c2e07dfc5` |
+| Pool | `0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a` |
+| Fee token (STRK) | `0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d` |
+| Deploy tx | `0x44b7936025f8b82828c3ecc97e169d6544f849313fba87f29cc8de8582a8194` |
+| Cost | ~10.3 STRK (declare + deploy) |
+
+Verified after deploying: chain is `SN_MAIN`, `privacy_contract()` returns the mainnet pool,
+`get_claim` on an unknown commitment returns the all-zero sentinel, and all four events are in the
+ABI. The class hash is identical to the Sepolia deployment, so the code that passed the suite is
+exactly what is on mainnet.
+
+The declare reserves a ceiling of roughly 21 STRK before it will run, even though it charges about
+half that. Fund the deployer above the ceiling, not above the expected cost.
+
+**This address goes in `strk20.json` and `NEXT_PUBLIC_XENIA_ESCROW`.**
+
+
 ## Sepolia — 2026-08-26 (current)
 
 Redeployed after the constructor gained a fee token and Deposit gained optional pre-funding.
