@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xenia wallet probe</title>
+<style>
+  :root {
+    --bg: #fbfbfa; --fg: #1a1a18; --muted: #6b6b66; --line: #e4e4e0;
+    --card: #ffffff; --ok: #1a7f4b; --bad: #b3261e; --warn: #8a6100; --accent: #2f5fd0;
+  }
+  :root:not([data-theme="light"]) { }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16161a; --fg: #ececea; --muted: #9a9a94; --line: #2c2c32;
+      --card: #1e1e23; --ok: #4ec98a; --bad: #f2837c; --warn: #e0b062; --accent: #7da4ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 2rem 1.25rem 4rem; background: var(--bg); color: var(--fg);
+         font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 1.45rem; margin: 0 0 .35rem; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 1.75rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+          padding: 1.1rem 1.25rem; margin-bottom: 1rem; }
+  .card h2 { font-size: .78rem; text-transform: uppercase; letter-spacing: .09em;
+             color: var(--muted); margin: 0 0 .8rem; font-weight: 600; }
+  button { font: inherit; font-weight: 550; padding: .6rem 1.1rem; border-radius: 7px;
+           border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--accent); }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+  .kv { display: grid; grid-template-columns: 190px 1fr; gap: .3rem .9rem; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; word-break: break-all; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+           font-size: .86em; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: .8rem;
+        overflow-x: auto; font-size: .82em; margin: .5rem 0 0; }
+  .verdict { font-size: 1.02rem; font-weight: 600; padding: .85rem 1rem; border-radius: 8px;
+             border: 1px solid var(--line); margin-top: .3rem; }
+  ul { margin: .4rem 0 0; padding-left: 1.15rem; } li { margin: .2rem 0; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: .88em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Xenia wallet probe</h1>
+  <p class="sub">
+    Answers three things without spending anything: does this wallet speak STRK20, has this account
+    ever registered, and what does the pool charge. All read-only — nothing is submitted.
+  </p>
+
+  <div class="card">
+    <h2>1 · Wallet</h2>
+    <div class="row">
+      <button id="connect">Connect wallet</button>
+      <span id="detected" class="sub" style="margin:0"></span>
+    </div>
+    <dl class="kv" id="walletInfo" style="margin-top:1rem"></dl>
+  </div>
+
+  <div class="card">
+    <h2>2 · Does it speak STRK20?</h2>
+    <p class="sub" style="margin:0 0 .5rem">
+      <code>wallet_strk20Balances</code> is read-only and safe to call against any wallet. A wallet
+      that answers "not implemented" has told us to show a different path.
+    </p>
+    <div id="strk20">Connect first.</div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Has this account registered?</h2>
+    <p class="sub" style="margin:0 0 .5rem">
+      Read straight from the pool. A zero public key means never registered — which is exactly the
+      account we need for the claim test. Keep it that way.
+    </p>
+    <div id="registration">Connect first.</div>
+  </div>
+
+  <div class="card">
+    <h2>4 · Verdict</h2>
+    <div id="verdict" class="verdict">Waiting…</div>
+  </div>
+</main>
+
+<script>
+const NETWORKS = {
+  '0x534e5f4d41494e': { name: 'mainnet', rpc: 'https://rpc.starknet.lava.build',
+    pool: '0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a' },
+  '0x534e5f5345504f4c4941': { name: 'sepolia', rpc: 'https://api.zan.top/public/starknet-sepolia',
+    pool: '0x0254a6b2997ef52e9f830ce1f543f6b29768295e8d17e2267d672c552cfe0d91' },
+};
+const GET_PUBLIC_KEY = '0x1a35984e05126dbecb7c3bb9929e7dd9106d460c59b1633739a5c733a5fb13b';
+const GET_FEE_AMOUNT = '0x3d323cd692ad43935b81ce230c47bfc57f69656249c5a33fe5223c17dd32ed2';
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+
+/** Wallets inject themselves as window.starknet_*; take whatever is there. */
+function findWallets() {
+  return Object.keys(window)
+    .filter((k) => k.startsWith('starknet_'))
+    .map((k) => ({ key: k, obj: window[k] }))
+    .filter((w) => w.obj && typeof w.obj === 'object');
+}
+
+async function rpc(url, method, params) {
+  const r = await fetch(url, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || JSON.stringify(j.error));
+  return j.result;
+}
+
+const found = findWallets();
+$('detected').textContent = found.length
+  ? `detected: ${found.map((w) => w.key.replace('starknet_', '')).join(', ')}`
+  : 'no Starknet wallet detected in this browser';
+if (!found.length) $('connect').disabled = true;
+
+$('connect').addEventListener('click', async () => {
+  $('connect').disabled = true;
+  $('connect').textContent = 'Connecting…';
+  const notes = [];
+  try {
+    // Prefer Ready/Argent, since that is the implementation support could confirm.
+    const pick = found.find((w) => /argent|ready/i.test(w.key)) ?? found[0];
+    const wallet = pick.obj;
+
+    let address, chainId;
+    try {
+      const accounts = await wallet.request({ type: 'wallet_requestAccounts' });
+      address = Array.isArray(accounts) ? accounts[0] : accounts;
+      chainId = await wallet.request({ type: 'wallet_requestChainId' });
+    } catch {
+      // Older injection style.
+      await wallet.enable?.();
+      address = wallet.selectedAddress ?? wallet.account?.address;
+      chainId = wallet.chainId ?? wallet.provider?.chainId;
+    }
+
+    const net = NETWORKS[chainId] ?? null;
+    $('walletInfo').innerHTML = `
+      <dt>wallet</dt><dd>${esc(pick.key)}</dd>
+      <dt>version</dt><dd>${esc(wallet.version ?? 'unknown')}</dd>
+      <dt>address</dt><dd>${esc(address ?? '—')}</dd>
+      <dt>chain</dt><dd>${esc(chainId ?? '—')} ${net ? `(${net.name})` : '<span class="warn">(unrecognised)</span>'}</dd>`;
+
+    // ── 2. STRK20 support ────────────────────────────────────────────────────────────────
+    let speaksStrk20 = false;
+    const attempts = [];
+    for (const type of ['wallet_strk20Balances', 'wallet_supportedSpecs', 'wallet_supportedWalletApi']) {
+      try {
+        const res = await wallet.request({ type });
+        attempts.push([type, 'ok', JSON.stringify(res).slice(0, 300)]);
+        if (type === 'wallet_strk20Balances') speaksStrk20 = true;
+      } catch (e) {
+        attempts.push([type, 'error', (e && e.message) || String(e)]);
+      }
+    }
+    $('strk20').innerHTML = attempts.map(([t, s, d]) =>
+      `<div><code>${esc(t)}</code> — <span class="${s === 'ok' ? 'ok' : 'bad'}">${s}</span>
+       <pre>${esc(d)}</pre></div>`).join('');
+    notes.push(speaksStrk20
+      ? 'Wallet answers wallet_strk20Balances — the Wallet API route is open.'
+      : 'Wallet did not answer wallet_strk20Balances. Check the error above: "not implemented" means this wallet cannot drive the claim.');
+
+    // ── 3. Registration + fee, read from the pool ────────────────────────────────────────
+    if (!net) {
+      $('registration').innerHTML = '<span class="warn">Unrecognised chain — switch to Sepolia or mainnet.</span>';
+    } else {
+      try {
+        const [pk] = await rpc(net.rpc, 'starknet_call', {
+          request: { contract_address: net.pool, entry_point_selector: GET_PUBLIC_KEY, calldata: [address] },
+          block_id: 'latest',
+        });
+        const [fee] = await rpc(net.rpc, 'starknet_call', {
+          request: { contract_address: net.pool, entry_point_selector: GET_FEE_AMOUNT, calldata: [] },
+          block_id: 'latest',
+        });
+        const registered = BigInt(pk) !== 0n;
+        const feeStrk = Number(BigInt(fee)) / 1e18;
+        $('registration').innerHTML = `
+          <dl class="kv">
+            <dt>viewing key on-chain</dt><dd>${esc(pk)}</dd>
+            <dt>registered?</dt>
+            <dd class="${registered ? 'warn' : 'ok'}">${registered ? 'YES — already a pool user' : 'NO — never registered'}</dd>
+            <dt>pool fee</dt><dd>${feeStrk} STRK per transaction</dd>
+          </dl>`;
+        notes.push(registered
+          ? 'This account has already registered, so it cannot be used for the register-and-claim test. Use a fresh one.'
+          : 'This account has never registered — exactly what the claim test needs. Do not shield or register with it.');
+        notes.push(`A claim must bring in at least ${feeStrk} STRK to balance the pool fee, unless the flow is sponsored.`);
+      } catch (e) {
+        $('registration').innerHTML = `<span class="bad">Could not read the pool: ${esc(e.message)}</span>`;
+      }
+    }
+
+    $('verdict').innerHTML = '<ul>' + notes.map((n) => `<li>${esc(n)}</li>`).join('') + '</ul>';
+  } catch (e) {
+    $('verdict').innerHTML = `<span class="bad">${esc((e && e.message) || String(e))}</span>`;
+  } finally {
+    $('connect').disabled = false;
+    $('connect').textContent = 'Connect wallet';
+  }
+});
+</script>
+</body>
+</html>
