@@ -238,23 +238,62 @@ $('connect').addEventListener('click', async () => {
       <dt>chain</dt><dd>${esc(chainId ?? '—')} ${net ? `(${net.name})` : '<span class="warn">(unrecognised)</span>'}</dd>`;
 
     // ── 2. STRK20 support ────────────────────────────────────────────────────────────────
-    let speaksStrk20 = false;
+    const STRK_TOKEN = '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d';
     const attempts = [];
-    for (const type of ['wallet_strk20Balances', 'wallet_supportedSpecs', 'wallet_supportedWalletApi']) {
+    let speaksStrk20 = false;
+    let apiVersions = [];
+
+    for (const type of ['wallet_supportedSpecs', 'wallet_supportedWalletApi']) {
       try {
         const res = await wallet.request({ type });
-        attempts.push([type, 'ok', JSON.stringify(res).slice(0, 300)]);
-        if (type === 'wallet_strk20Balances') speaksStrk20 = true;
+        attempts.push([type, 'ok', JSON.stringify(res)]);
+        if (Array.isArray(res)) apiVersions = apiVersions.concat(res);
+      } catch (e) { attempts.push([type, 'error', (e && e.message) || String(e)]); }
+    }
+
+    // STRK20 rides on Wallet API 0.10.3 and later.
+    const hasStrk20Api = apiVersions.some((v) => {
+      const [maj, min, pat] = String(v).split('.').map(Number);
+      return maj > 0 || min > 10 || (min === 10 && pat >= 3);
+    });
+
+    /**
+     * An empty payload returns INVALID_REQUEST_PAYLOAD — which means the method exists and the
+     * arguments were wrong, not that the wallet lacks it. Try the plausible shapes and report which
+     * one the wallet accepts.
+     */
+    const shapes = [
+      ['no params', undefined],
+      ['{tokenAddresses}', { tokenAddresses: [STRK_TOKEN] }],
+      ['{tokens}', { tokens: [STRK_TOKEN] }],
+      ['{addresses}', { addresses: [STRK_TOKEN] }],
+      ['array', [STRK_TOKEN]],
+      ['{token}', { token: STRK_TOKEN }],
+    ];
+    for (const [label, params] of shapes) {
+      try {
+        const res = await wallet.request(params === undefined
+          ? { type: 'wallet_strk20Balances' }
+          : { type: 'wallet_strk20Balances', params });
+        attempts.push([`wallet_strk20Balances ${label}`, 'ok', JSON.stringify(res).slice(0, 300)]);
+        speaksStrk20 = true;
+        break;
       } catch (e) {
-        attempts.push([type, 'error', (e && e.message) || String(e)]);
+        const msg = (e && e.message) || String(e);
+        attempts.push([`wallet_strk20Balances ${label}`, 'error', msg]);
+        // A payload complaint still proves the method is implemented.
+        if (/PAYLOAD|param|argument/i.test(msg)) speaksStrk20 = true;
       }
     }
     $('strk20').innerHTML = attempts.map(([t, s, d]) =>
       `<div><code>${esc(t)}</code> — <span class="${s === 'ok' ? 'ok' : 'bad'}">${s}</span>
        <pre>${esc(d)}</pre></div>`).join('');
+    notes.push(hasStrk20Api
+      ? `Wallet supports Wallet API ${apiVersions.join(', ')} — 0.10.3+ is what carries STRK20, so the Wallet API route is open.`
+      : `Wallet reports Wallet API ${apiVersions.join(', ') || 'unknown'} — STRK20 needs 0.10.3 or later.`);
     notes.push(speaksStrk20
-      ? 'Wallet answers wallet_strk20Balances — the Wallet API route is open.'
-      : 'Wallet did not answer wallet_strk20Balances. Check the error above: "not implemented" means this wallet cannot drive the claim.');
+      ? 'wallet_strk20Balances is implemented (a payload complaint still proves the method exists).'
+      : 'wallet_strk20Balances did not respond to any payload shape — treat the Wallet API route as unconfirmed.');
 
     // ── 3. Registration + fee, read from the pool ────────────────────────────────────────
     if (!net) {
