@@ -644,6 +644,13 @@ a {
     transform: none;
   }
 
+  .orbit-aura,
+  .orbit-band,
+  .orbit-track,
+  .orbit-node-inner {
+    animation: none;
+  }
+
   .acc-body {
     transition: none;
   }
@@ -882,19 +889,37 @@ th {
   }
 }
 
-@keyframes pulseAura {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.75;
+/* Rotating the hue layer is what makes the bloom drift: the green, blue and pink blobs sweep
+   round slowly instead of the whole disc pulsing in place. */
+@keyframes auraDrift {
+  0% {
+    transform: rotate(0deg) scale(1);
   }
   50% {
-    transform: scale(1.08);
+    transform: rotate(180deg) scale(1.07);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes bandBreathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.035);
     opacity: 1;
   }
 }
 
 .orbit-aura {
-  animation: pulseAura 8s ease-in-out infinite;
+  animation: auraDrift 34s linear infinite;
+}
+
+.orbit-band {
+  animation: bandBreathe 11s ease-in-out infinite;
 }
 
 .orbit-track {

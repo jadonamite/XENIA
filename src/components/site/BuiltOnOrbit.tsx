@@ -25,6 +25,15 @@ const NODES: OrbitNode[] = [
   { name: 'Vercel', symbol: 'VERCEL', category: 'Edge Distribution', glowColor: 'rgba(40, 40, 40, 0.5)', angle: 225 },
 ];
 
+// Concentric discs behind the hub. Each is lifted by its own shadow, which is what turns the
+// bloom into stepped depth instead of one blurred wash.
+const BANDS = [
+  { size: 396, fill: 0.14, rim: 0.5 },
+  { size: 318, fill: 0.16, rim: 0.55 },
+  { size: 242, fill: 0.19, rim: 0.6 },
+  { size: 172, fill: 0.24, rim: 0.68 },
+];
+
 export function BuiltOnOrbit() {
   const [hoveredNode, setHoveredNode] = useState<OrbitNode | null>(null);
 
@@ -80,43 +89,48 @@ export function BuiltOnOrbit() {
         }}
       >
         {/*
-         * The bloom is a set of off-centre colour blobs inside one circle, not concentric rings.
-         * Concentric stops average out to flat grey; separated hues keep the iridescence readable.
+         * Two layers do different jobs. The hue layer carries the iridescence and drifts; the
+         * bands are concentric discs stacked on top of it, each one lifted by its own shadow so
+         * the colour reads as segmented depth rather than a single flat wash.
          */}
         <div
           className="orbit-aura"
           style={{
             position: 'absolute',
-            width: 366,
-            height: 366,
+            width: 400,
+            height: 400,
             borderRadius: '50%',
             background: [
-              'radial-gradient(circle at 66% 20%, rgba(126, 232, 186, 0.78) 0%, transparent 58%)',
-              'radial-gradient(circle at 88% 58%, rgba(136, 194, 250, 0.78) 0%, transparent 60%)',
-              'radial-gradient(circle at 28% 76%, rgba(255, 178, 205, 0.78) 0%, transparent 60%)',
-              'radial-gradient(circle at 18% 34%, rgba(196, 180, 246, 0.72) 0%, transparent 58%)',
-              'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 62%)',
+              'radial-gradient(circle at 66% 20%, rgba(126, 232, 186, 0.82) 0%, transparent 55%)',
+              'radial-gradient(circle at 88% 58%, rgba(136, 194, 250, 0.82) 0%, transparent 57%)',
+              'radial-gradient(circle at 28% 76%, rgba(255, 178, 205, 0.82) 0%, transparent 57%)',
+              'radial-gradient(circle at 18% 34%, rgba(196, 180, 246, 0.76) 0%, transparent 55%)',
             ].join(', '),
-            filter: 'blur(38px)',
-            pointerEvents: 'none',
-            zIndex: 0,
-          }}
-        />
-        <div
-          style={{
-            position: 'absolute',
-            width: 196,
-            height: 196,
-            borderRadius: '50%',
-            background:
-              'radial-gradient(circle, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.18) 55%, transparent 100%)',
-            filter: 'blur(28px)',
+            filter: 'blur(34px)',
             pointerEvents: 'none',
             zIndex: 0,
           }}
         />
 
-        {/* One ring, at the orbit radius. The extra inner circles read as clutter against the bloom. */}
+        {BANDS.map((band, i) => (
+          <div
+            key={band.size}
+            className="orbit-band"
+            style={{
+              position: 'absolute',
+              width: band.size,
+              height: band.size,
+              borderRadius: '50%',
+              background: `radial-gradient(circle, rgba(255, 255, 255, ${band.fill}) 0%, rgba(255, 255, 255, 0) 74%)`,
+              boxShadow: `inset 0 0 26px rgba(255, 255, 255, ${band.rim}), 0 14px 34px -16px rgba(24, 36, 66, 0.22)`,
+              animationDelay: `${i * -1.6}s`,
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+          />
+        ))}
+
+        {/* Thin orbit path, plus one inner guide so the bands have something to register against. */}
         <div
           style={{
             position: 'absolute',
@@ -125,27 +139,67 @@ export function BuiltOnOrbit() {
             borderRadius: '50%',
             border: '1px solid rgba(0, 0, 0, 0.07)',
             pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            width: 300,
+            height: 300,
+            borderRadius: '50%',
+            border: '1px solid rgba(0, 0, 0, 0.045)',
+            pointerEvents: 'none',
+            zIndex: 2,
           }}
         />
 
-        {/* Central Hub with Big Xenia Logo & Deep 3D Drop Shadow */}
+        {/* Central hub. Three nested plates, each with its own shadow, so the mark sits on a stack
+            rather than on a single card. */}
         <div
           style={{
             position: 'relative',
-            width: 104,
-            height: 104,
-            borderRadius: 28,
-            background: '#ffffff',
-            border: '1px solid rgba(0, 0, 0, 0.05)',
-            boxShadow:
-              '0 32px 64px -12px rgba(0, 0, 0, 0.20), 0 16px 32px -8px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.03), inset 0 2px 0 rgba(255, 255, 255, 0.9)',
+            width: 152,
+            height: 152,
+            borderRadius: 46,
+            background: 'rgba(255, 255, 255, 0.42)',
+            boxShadow: '0 44px 88px -34px rgba(20, 32, 60, 0.22)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 10,
           }}
         >
-          <Mark size={58} id="orbit-center-mark" />
+          <div
+            style={{
+              width: 126,
+              height: 126,
+              borderRadius: 36,
+              background: 'rgba(255, 255, 255, 0.78)',
+              boxShadow:
+                '0 26px 54px -24px rgba(20, 32, 60, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.95)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: 104,
+                height: 104,
+                borderRadius: 28,
+                background: '#ffffff',
+                border: '1px solid rgba(0, 0, 0, 0.05)',
+                boxShadow:
+                  '0 32px 64px -12px rgba(0, 0, 0, 0.20), 0 16px 32px -8px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0, 0, 0, 0.03), inset 0 2px 0 rgba(255, 255, 255, 0.9)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Mark size={58} id="orbit-center-mark" />
+            </div>
+          </div>
         </div>
 
         {/* Revolving Orbit Ring Track */}
@@ -186,16 +240,16 @@ export function BuiltOnOrbit() {
                   className="orbit-node-inner"
                   style={{
                     position: 'relative',
-                    width: 58,
-                    height: 58,
+                    width: 74,
+                    height: 74,
                   }}
                 >
                   {/* Colored ambient glow drop shadow under each tile */}
                   <div
                     style={{
                       position: 'absolute',
-                      inset: -8,
-                      borderRadius: 22,
+                      inset: -4,
+                      borderRadius: 26,
                       background: node.glowColor,
                       filter: 'blur(18px)',
                       opacity: isHovered ? 0.75 : 0.26,
@@ -205,26 +259,39 @@ export function BuiltOnOrbit() {
                     }}
                   />
 
-                  {/* Satellite Squircle Tile */}
+                  {/* Outer plate, then the tile. Same stacked-shadow idea as the hub, scaled down. */}
                   <div
                     style={{
                       width: '100%',
                       height: '100%',
-                      borderRadius: 18,
-                      background: '#ffffff',
-                      border: '1px solid rgba(0, 0, 0, 0.05)',
-                      boxShadow: isHovered
-                        ? '0 20px 48px rgba(0, 0, 0, 0.18)'
-                        : '0 12px 28px -3px rgba(0, 0, 0, 0.09), 0 3px 8px rgba(0, 0, 0, 0.03)',
+                      borderRadius: 24,
+                      background: 'rgba(255, 255, 255, 0.5)',
+                      boxShadow: '0 20px 40px -22px rgba(20, 32, 60, 0.28)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      transform: isHovered ? 'scale(1.15) translateY(-3px)' : 'none',
+                      transform: isHovered ? 'scale(1.12) translateY(-3px)' : 'none',
                       transition: 'all 220ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-                      padding: 11,
                     }}
                   >
-                    <TokenLogo symbol={node.symbol} size={34} />
+                    <div
+                      style={{
+                        width: 56,
+                        height: 56,
+                        borderRadius: 18,
+                        background: '#ffffff',
+                        border: '1px solid rgba(0, 0, 0, 0.05)',
+                        boxShadow: isHovered
+                          ? '0 20px 44px -12px rgba(0, 0, 0, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.9)'
+                          : '0 12px 28px -10px rgba(0, 0, 0, 0.16), 0 3px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'box-shadow 220ms ease',
+                      }}
+                    >
+                      <TokenLogo symbol={node.symbol} size={32} />
+                    </div>
                   </div>
 
                   {/* Tooltip on hover */}
