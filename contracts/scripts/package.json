@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Declare and deploy XeniaEscrow. Kept separate from the client so contract tooling does not depend on the Next.js build.",
   "scripts": {
+    "preflight": "node --env-file=.env preflight.mjs",
     "deploy": "node --env-file=.env declare-and-deploy.mjs",
     "deploy:dry": "node --env-file=.env declare-and-deploy.mjs --dry-run"
   },
