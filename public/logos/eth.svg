@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <circle cx="50" cy="50" r="50" fill="#627EEA"/>
+  <path d="M51.5 12V39.7L75 50.2L51.5 12Z" fill="#FFFFFF" fill-opacity="0.6"/>
+  <path d="M51.5 12L28 50.2L51.5 39.7V12Z" fill="#FFFFFF"/>
+  <path d="M51.5 68.6V87.5L75 55L51.5 68.6Z" fill="#FFFFFF" fill-opacity="0.6"/>
+  <path d="M51.5 87.5V68.6L28 55L51.5 87.5Z" fill="#FFFFFF"/>
+  <path d="M51.5 64.3L75 50.2L51.5 39.7V64.3Z" fill="#FFFFFF" fill-opacity="0.2"/>
+  <path d="M28 50.2L51.5 64.3V39.7L28 50.2Z" fill="#FFFFFF" fill-opacity="0.6"/>
+</svg>
