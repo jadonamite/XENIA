@@ -56,8 +56,10 @@
     <h2>1 · Wallet</h2>
     <div class="row">
       <button id="connect">Connect wallet</button>
+      <button id="rescan" class="ghost">Rescan</button>
       <span id="detected" class="sub" style="margin:0"></span>
     </div>
+    <dl class="kv" id="diag" style="margin-top:1rem"></dl>
     <dl class="kv" id="walletInfo" style="margin-top:1rem"></dl>
   </div>
 
@@ -98,12 +100,34 @@ const GET_FEE_AMOUNT = '0x3d323cd692ad43935b81ce230c47bfc57f69656249c5a33fe5223c
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
 
-/** Wallets inject themselves as window.starknet_*; take whatever is there. */
+/**
+ * Two discovery mechanisms, because wallets moved between them.
+ *
+ * Legacy: the wallet writes itself onto window as `starknet_<name>`.
+ * Wallet Standard: the app announces itself and wallets call back to register. Newer builds of
+ * Ready and Braavos use this one only, which is why checking `window.starknet_*` alone finds
+ * nothing.
+ */
+const standardWallets = [];
+(function discoverStandard() {
+  const api = {
+    register: (...ws) => { standardWallets.push(...ws); return () => {}; },
+  };
+  window.addEventListener('wallet-standard:register-wallet', (e) => {
+    try { e.detail(api); } catch (err) { /* ignore a wallet that misbehaves */ }
+  });
+  window.dispatchEvent(new CustomEvent('wallet-standard:app-ready', { detail: api }));
+})();
+
 function findWallets() {
-  return Object.keys(window)
-    .filter((k) => k.startsWith('starknet_'))
-    .map((k) => ({ key: k, obj: window[k] }))
+  const legacy = Object.keys(window)
+    .filter((k) => k.startsWith('starknet'))
+    .map((k) => ({ key: k, obj: window[k], kind: 'legacy' }))
     .filter((w) => w.obj && typeof w.obj === 'object');
+  const standard = standardWallets.map((w) => ({
+    key: w.name ?? 'unnamed', obj: w, kind: 'standard',
+  }));
+  return [...legacy, ...standard];
 }
 
 async function rpc(url, method, params) {
@@ -116,11 +140,34 @@ async function rpc(url, method, params) {
   return j.result;
 }
 
-const found = findWallets();
-$('detected').textContent = found.length
-  ? `detected: ${found.map((w) => w.key.replace('starknet_', '')).join(', ')}`
-  : 'no Starknet wallet detected in this browser';
-if (!found.length) $('connect').disabled = true;
+let found = [];
+function refreshDetection() {
+  found = findWallets();
+  const isFile = location.protocol === 'file:';
+  if (found.length) {
+    $('detected').innerHTML = 'detected: ' + found
+      .map((w) => `<b>${esc(w.key.replace('starknet_', ''))}</b> <span class="sub">(${w.kind})</span>`)
+      .join(', ');
+    $('connect').disabled = false;
+  } else {
+    $('detected').innerHTML = '<span class="bad">no Starknet wallet detected</span>' + (isFile
+      ? ' — this page is open as a <code>file://</code> URL, and extensions usually do not inject there. Serve it over http instead.'
+      : ' — is the extension unlocked and enabled for this site?');
+    $('connect').disabled = true;
+  }
+  $('diag').innerHTML = `
+    <dl class="kv">
+      <dt>page origin</dt><dd>${esc(location.origin || 'file://')}</dd>
+      <dt>legacy objects</dt><dd>${esc(Object.keys(window).filter((k) => k.startsWith('starknet')).join(', ') || 'none')}</dd>
+      <dt>wallet-standard</dt><dd>${esc(standardWallets.map((w) => w.name).join(', ') || 'none registered')}</dd>
+      <dt>features</dt><dd>${esc(standardWallets.map((w) => `${w.name}: ${Object.keys(w.features || {}).join(' ')}`).join(' | ') || '—')}</dd>
+    </dl>`;
+}
+refreshDetection();
+// Wallets sometimes register a beat after page load.
+setTimeout(refreshDetection, 400);
+setTimeout(refreshDetection, 1500);
+$('rescan').addEventListener('click', refreshDetection);
 
 $('connect').addEventListener('click', async () => {
   $('connect').disabled = true;
