@@ -15,4 +15,13 @@ build/
 .next/
 next-env.d.ts
 tsconfig.tsbuildinfo
+
+# Cairo build output
+contracts/target/
+.snfoundry_cache/
+
+# snforge log written by CI
+contracts/snforge.log
+
+# vercel
 .vercel

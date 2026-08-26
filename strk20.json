@@ -1,6 +1,8 @@
 {
   "transactions": [],
-  "contracts": [],
+  "contracts": [
+    "0x257082062a074eb79575b859c9b3aadd40a986501223928121b5a1f56627095"
+  ],
   "demo_video": "",
   "demo_url": "https://usexenia.vercel.app"
 }
