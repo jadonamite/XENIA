@@ -3,8 +3,10 @@
 Jadon — four changes, all in `src/lib/xenia/`. Until these land, every claim reverts. Sorry: two
 of them are the PRD's fault, not yours, and I've noted which.
 
-The contract is deployed nowhere yet, so nothing here is urgent in the "production is broken"
-sense — but it is worth doing before more UI is built on top.
+**The contract is live on mainnet** at
+`0x257082062a074eb79575b859c9b3aadd40a986501223928121b5a1f56627095` (Sepolia:
+`0x7d01c97a95ddc117ac63be7a6ab4b042d87d8a70c1cadbdb1f4c1f88b68094e`), so these are the only thing
+standing between the client and a working transaction.
 
 Cross-check against [`INTERFACE.md`](INTERFACE.md), which is the frozen shape.
 

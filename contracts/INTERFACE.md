@@ -6,6 +6,16 @@ and both people are told before either pushes.
 Source of truth for the shape: [`src/xenia_escrow.cairo`](src/xenia_escrow.cairo). This file
 explains how to drive it.
 
+## Deployed
+
+| Network | Address |
+|---|---|
+| **Mainnet** | `0x257082062a074eb79575b859c9b3aadd40a986501223928121b5a1f56627095` |
+| Sepolia | `0x7d01c97a95ddc117ac63be7a6ab4b042d87d8a70c1cadbdb1f4c1f88b68094e` |
+
+Same class hash on both, so behaviour is identical. Set `NEXT_PUBLIC_XENIA_ESCROW` to whichever
+network you are pointing at. Full detail in [`DEPLOYMENTS.md`](DEPLOYMENTS.md).
+
 ---
 
 ## Entry point
@@ -42,10 +52,15 @@ Verified against the built ABI in `target/dev/xenia_XeniaEscrow.contract_class.j
 | 3 | `amount` | `u128` | `0` | `0` |
 | 4 | `expiry` | absolute unix ts | `0` | `0` |
 | 5 | `refund_to` | sender's address | `0` | `0` |
-| 6 | `claimant` | `0` | claimant address | refunder address |
+| 6 | `claimant` | `0`, or an address to pre-fund | claimant address | refunder address |
 | 7 | `sig_r` | `0` | signature r | signature r |
 | 8 | `sig_s` | `0` | signature s | signature s |
-| 9 | `note_id` | `0` | `${openNoteIds[0]}` | `${openNoteIds[0]}` |
+| 9 | `note_id` | `0`, or the amount to pre-fund | `${openNoteIds[0]}` | `${openNoteIds[0]}` |
+
+> **Pre-funding is optional.** Positions 6 and 9 were unused on Deposit, so they now carry an
+> address to pre-fund and how much, and **zero in either keeps the old behaviour exactly**. They
+> were reused rather than appended because the pool deserialises calldata positionally — appending
+> would change the length and break every caller. See "Pre-funding a claimant" below.
 
 > **Row 1 is the easy mistake.** On Deposit you pass the *hash*. On Claim and Refund you pass the
 > *public key* — the contract hashes it itself and looks that up. Passing the hash on a claim finds
@@ -151,6 +166,38 @@ generated `sk`, so the sender can always sign. Consequences worth being delibera
 
 The alternative — a direct ERC-20 transfer to `refund_to` with an empty span — *is* enforceable,
 but it publishes the sender's address next to the escrow and contradicts ARCHITECTURE §4, which
-specifies the refund credits "the sender's own open note". **Sam's call; flagged rather than
-decided silently.** PRD §4.4.6 and the §4.7 refund test should be reworded to match whichever
-survives.
+specifies the refund credits "the sender's own open note".
+
+**Decided 26 Aug: the signature approach stands.** PRD §4.4.6 and the §4.7 test have been reworded
+to match. Mainnet traces settled it — private transactions are submitted by rotating relayers, so
+even the transaction sender is not the user, and no caller-based check could ever work.
+
+---
+
+## Pre-funding a claimant
+
+A first-time claimant cannot pay the pool fee. The pool charges 6 STRK per transaction on mainnet,
+the relayer fronts it and reclaims it with a `withdraw`, and the pool's balance invariant requires
+an inflow to match that withdrawal. Someone holding nothing inside the pool has none, so the
+transaction is refused — **by the protocol, not by the wallet**. Working in
+[`ONCHAIN-FINDINGS.md`](ONCHAIN-FINDINGS.md).
+
+So a deposit can send the claimant the fee ahead of time:
+
+```js
+// create-claim, with pre-funding
+calldata: [0, commitment, token, amount, expiry, refundTo, prefundTo, 0, 0, prefundAmount]
+```
+
+Two things to get right:
+
+- **The escrow needs the fee token to send.** Add a second `withdraw` action for STRK alongside the
+  claim token's, both to `XENIA_ESCROW`. A claim denominated in USDC still owes its fee in STRK.
+- **Pay out of the escrow, never from the sender's own address.** Had the sender funded the
+  claimant directly, the trail sender → claimant would be public and would expose exactly the edge
+  Xenia exists to hide. Coming from a shared contract leaks nothing.
+
+`ClaimPrefunded { commitment, recipient, amount }` is emitted when it happens. It is a separate
+event so `ClaimCreated` keeps the shape you already read.
+
+Zero in either field skips all of this, so links work with or without it.
