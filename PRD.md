@@ -7,29 +7,38 @@ The interface in §4 is frozen. Both sides build against it independently.
 
 ---
 
-## 0. Urgent — Sam, these three before you write the claim branch
+## 0. Blockers — settled, 26 Aug
 
-**0.1 Ask the sprint team for the mainnet proving service URL. Today.**
-It is not published. The Wallet API route needs only an RPC URL because the user's wallet reaches a
-prover itself; the SDK route means we reach it, and on mainnet that endpoint does not exist
-publicly. The sprint's own Day-0 doc says teams that need it should open an issue and ask, and
-calls it "the one blocker a team cannot work around on its own." We may never use it — but if the
-wallet probe fails on day 5 and we have not asked, the fallback is gone. Ask now, regardless of
-what the probe says. Telegram escalation is yours.
+All three of these are now answered, two of them by measuring mainnet rather than waiting on a
+reply. Full working in `contracts/ONCHAIN-FINDINGS.md`.
 
-**0.2 `XeniaEscrow` must emit an event on every state-changing path.**
-The sprint validator requires that if `contracts` is non-empty, each transaction listed in
-`strk20.json` also carries an event emitted by one of those contracts. The reference escrow emits
-nothing. A straight port gives us three valid-looking mainnet transactions that fail validation and
-score as if we never shipped. Events are specified in §4.3. Not polish.
+**0.1 The mainnet proving service URL — not needed.**
+It is only required on the SDK route. The Wallet API route is the one route that needs no proving
+service of your own, and Ready reports Wallet API `0.10.3`, which is the version carrying STRK20.
+The SDK route is dead on mainnet anyway: no public prover, and `ContractDiscoveryProvider` is not
+exported in `0.14.3-rc.5`, so it would also need a hosted indexer.
 
-**0.3 The mainnet pool address is confirmed — the one in the STRK20 docs is Sepolia.**
-Verified values are in §5.4. Do not deploy or test against the docs address.
+**0.2 `XeniaEscrow` emits on every state-changing path.** Done — `ClaimCreated`, `ClaimRedeemed`,
+`ClaimRefunded`, plus `ClaimPrefunded`. Confirmed present in the deployed mainnet ABI.
 
-Also read §4.1 (the frozen signature) and §4.5 (link keypair instead of a bare secret) before the
-claim branch — §4.5 changes the calldata.
+**0.3 The mainnet pool is confirmed** and the contract is deployed against it. Values in §5.4.
 
----
+### What measuring mainnet also established
+
+- **Registration does bundle into a larger transaction**, in production today — but every observed
+  case rides alongside a `Deposit`. Never a pure receive, which is our shape.
+- **The fee is fronted by a relayer and reclaimed from the pool.** The claimant needs no public
+  STRK and no allowance, and pays no gas — but the reimbursement is a `withdraw`, and the pool's
+  balance invariant requires an inflow to match it. A first-time claimant has none, so a pure
+  receive is refused **by the protocol, not by the wallet**.
+- **Sponsorship is not in use.** 18 of 18 note-bearing transactions were relayer-reimbursed; none
+  sponsored, none self-paid.
+- **A dapp can register a user itself** — registration is a plain call to the pool's public
+  `apply_actions`. The fallback is two clicks on our page, never a trip into wallet settings.
+
+Consequence: a claim needs an inflow covering the fee. `XeniaEscrow` supports pre-funding the
+claimant out of the escrow for exactly this, opt-in, using two Deposit parameters that were
+previously zero — so the calldata shape does not change.
 
 ## 1. Product
 
@@ -67,7 +76,7 @@ The mainnet weight is mechanical and most of the field fails it. It comes first.
 
 | Field | Requirement |
 |---|---|
-| `transactions` | ≥3 mainnet hashes. Each must exist, have succeeded, and have touched the STRK20 pool |
+| `transactions` | ≥3 mainnet hashes. Each must exist, have succeeded, and be **tied to a listed contract** — see below |
 | `contracts` | `XeniaEscrow`'s mainnet address |
 | `demo_url` | Public, no login wall |
 | `demo_video` | 3 minutes |
@@ -78,6 +87,14 @@ The three transactions:
 2. **Create claim** — invokes `XeniaEscrow`, funds park in the helper
 3. **Claim** — from an account that has never registered: register and claim, one transaction
 
+> **Confirmed 26 Aug.** The sprint team put it plainly: *"If contracts is non-empty, a plain shield
+> won't count. Each listed tx must succeed, emit a pool event, and be tied to one of the declared
+> contracts. The checker accepts either an event from that contract or its address in calldata."*
+>
+> So the three listed transactions must be **create-claim, claim and refund** — all of which run
+> through `XeniaEscrow` and emit its events. The shield still happens; it just cannot be one of the
+> three. This makes the refund path demo-critical rather than a safety net.
+>
 > **Listing a contract raises the bar on every transaction.** The sprint validator requires that if
 > `contracts` is non-empty, each listed transaction must also carry an **event emitted by one of
 > those contracts**. Touching the pool through someone else's contract does not count as your
@@ -199,8 +216,20 @@ Indexing `commitment` also gives the client a free way to read claim status with
 4. Claim recomputes the commitment from the link key. It never trusts a passed-in commitment as
    authorisation.
 5. `claimed` flips exactly once. A second claim reverts; a refund after a claim reverts.
-6. Claim requires `get_block_timestamp() < expiry`. Refund requires `>= expiry` **and** a caller
-   matching `refund_to`.
+6. Claim requires `get_block_timestamp() < expiry`. Refund requires `>= expiry` **and a signature
+   under `XENIA_REFUND_V1`**.
+
+   > **Corrected 26 Aug.** This originally said refund requires "a caller matching `refund_to`".
+   > That cannot be implemented. `privacy_invoke` is always called *by the pool*, so
+   > `get_caller_address()` is the pool's address on every path — and mainnet traces confirm
+   > private transactions are submitted by rotating relayers, so even the transaction sender is not
+   > the user. The assert would have rejected every refund ever made.
+   >
+   > Refund is therefore authorised the way a claim is, by proving possession of the link key,
+   > under its own domain tag so the two can never be replayed for each other. `refund_to` is
+   > stored and emitted for the `/claims` UI but gates nothing. After expiry anyone holding the
+   > link can sweep it — they could have claimed it before expiry anyway, so this grants no new
+   > capability. See `contracts/INTERFACE.md`.
 7. Domain-separated hashing throughout, so Xenia commitments cannot collide with anything else.
 8. The escrow `approve`s the pool to pull and returns an `OpenNoteDeposit`. It never transfers
    tokens directly.
@@ -256,7 +285,7 @@ Ship with these passing:
 - claim with a signature over a different address reverts `BAD_SIGNATURE`
 - claim after expiry reverts `CLAIM_EXPIRED`
 - refund before expiry reverts `NOT_YET_EXPIRED`
-- refund by anyone other than `refund_to` reverts `NOT_REFUND_OWNER`
+- refund not signed by the link key reverts `NOT_REFUND_OWNER` (see the note in §4.4.6)
 - refund after a claim reverts `ALREADY_CLAIMED`
 - a caller that is not the pool reverts `CALLER_NOT_PRIVACY`
 - every successful path emits its event
@@ -269,9 +298,18 @@ Action list, in phase order:
 
 ```
 { type: 'withdraw', token, amount, recipient: XENIA_ESCROW }
-{ type: 'invoke',   contract: XENIA_ESCROW, calldata: [Deposit, commitment, token,
-                                                       amount, expiry, refund_to] }
+{ type: 'invoke',   contract: XENIA_ESCROW,
+  calldata: [Deposit, commitment, token, amount, expiry, refund_to, 0, 0, 0, 0] }
 ```
+
+> **Corrected 26 Aug — this is where the client went wrong.** These lists previously showed six
+> calldata elements. §4.1 freezes a **ten**-parameter entrypoint, and the pool forwards calldata
+> unchanged for Starknet to deserialise positionally, so every operation must send all ten with
+> unused positions as `0`. Six felts against ten parameters fails before our code runs. Verified
+> against the pool's own source and covered by `tests/test_pool_handshake.cairo`.
+>
+> Note also that Claim and Refund pass the link **public key** in position 1, not the commitment —
+> the contract hashes it and looks that up itself.
 
 The withdraw settles the pool's balance invariant, which is why the escrow returns an empty span.
 The link is `https://<host>/c#<sk>` — the key lives in the URL fragment and is never sent to a
@@ -289,7 +327,7 @@ server.
 action with amount `OPEN`. The amount is measured at execution, which is how the open note gets
 credited with a value the client never states.
 
-### 5.3 Claim route — settle this on Day 1, before any UI
+### 5.3 Claim route — settled: Wallet API
 
 Registration is phase 0 and the invoke is phase 7, so the protocol permits register-and-claim in
 one transaction. The route does not obviously permit it.
@@ -302,6 +340,16 @@ and `autoRegister` is an **SDK** flag, not a wallet one.
 
 So the Wallet API route works only if the connected wallet registers the account itself while
 assembling the transaction.
+
+**Settled 26 Aug: the Wallet API route.** Ready reports Wallet API `0.10.3`, the version carrying
+STRK20 (`contracts/scripts/probe.html` checks this against a live wallet). The SDK route is not
+viable on mainnet — no public prover, and discovery would need a hosted indexer.
+
+What is **still unproven** is whether Ready emits a phase-0 registration for our exact shape:
+`transfer("OPEN") + invoke` with no deposit. Mainnet shows registration bundling only alongside a
+`Deposit`. Support advises not relying on first-use registration through a dapp call. Plan for
+two-step and be pleased if it folds in — and note that a claim carrying pre-funding *is* a shape
+with money going in, which is the shape that has been observed working.
 
 **Probe first, build second.** Connect an account that has never registered and submit a
 claim-shaped transaction on testnet.
@@ -333,6 +381,12 @@ support does:
   wallet does.
 - **SDK route** means we reach the proving service, so we need its URL, and on mainnet it does not
   exist publicly yet. Teams that need it are told to open an issue and ask.
+
+**The pool fee, measured live 26 Aug:** `get_fee_amount()` is **6 STRK on mainnet**, 2 on Sepolia,
+charged per pool transaction. The relayer fronts it and reclaims it from the pool, so the claimant
+needs no public STRK and pays no gas — but that reclaim is a `withdraw`, and the balance invariant
+demands a matching inflow. Size demo claims well above 6 STRK; a fee that large against a small
+claim reads badly on video.
 
 Registering a viewing key and shielding need **no proof at all** — both are ordinary public
 transactions. Spending notes privately is what needs a prover, which is why the claim transaction
@@ -376,10 +430,10 @@ do something about it. If another team depends on it, that counts in our favour.
 
 ## 7. Division
 
-| Owner | Surface |
-|---|---|
-| Sam | `XeniaEscrow`, tests, testnet and mainnet deploys, calldata shape, the three transactions, `strk20.json` |
-| Jadon | Client, claim flow, link and key generation, pages, Vercel, README, leak table, video |
+| Owner | Surface | State |
+|---|---|---|
+| Sam | `XeniaEscrow`, tests, testnet and mainnet deploys, calldata shape, the three transactions, `strk20.json` | Contract **done**: 26 tests green, deployed and verified on Sepolia and mainnet, `contracts` field filled. Transactions await the client. |
+| Jadon | Client, claim flow, link and key generation, pages, Vercel, README, leak table, video | Four blocking defects in `contracts/CLIENT-FIXES.md` — nothing transacts until they land |
 
 Interface frozen Day 1 (§4.1). The client builds against a stub helper on testnet until the real
 one is deployed.

@@ -2,7 +2,34 @@
 
 **Deadline: Aug 31, 23:59 UTC.** Nothing to submit — whatever the repo shows at that moment is the entry.
 
-Today is **Aug 23**. **8 days.**
+Today is **Aug 26**. **5 days.**
+
+## Where it stands
+
+**Contract and chain (Sam) — done.**
+
+| | |
+|---|---|
+| `XeniaEscrow` | 26 tests green in CI |
+| Mainnet | `0x257082062a074eb79575b859c9b3aadd40a986501223928121b5a1f56627095` |
+| Sepolia | `0x7d01c97a95ddc117ac63be7a6ab4b042d87d8a70c1cadbdb1f4c1f88b68094e` |
+| `strk20.json` | `contracts` filled |
+| Deployer | 15.99 STRK left for the demo transactions |
+
+Tests cover the escrow's logic, cross-language agreement with the client's JavaScript (a real
+browser signature verifying in Cairo), and the full lifecycle driven through a mock pool using the
+exact flat calldata the client will send.
+
+**Client (Jadon) — blocked, and unaware.** Four defects in `contracts/CLIENT-FIXES.md`; nothing
+transacts until they land. Two of them are the PRD's fault, since §5.1/§5.2 showed six calldata
+elements against a ten-parameter entrypoint. Both now corrected.
+
+**The three mainnet transactions — not started.** They are the pass/fail requirement and they run
+entirely through the client. Because `contracts` is now non-empty, they must be **create-claim,
+claim and refund**; a plain shield does not count.
+
+**Still unproven:** whether Ready folds registration into our claim shape. Needs a browser, a
+working client, and the untouched Sepolia account.
 
 ---
 
@@ -136,3 +163,23 @@ Treat **Aug 30, 23:59** as the real deadline so this day is spare.
 - **Aug 23** — Kharon abandoned. Its premise (nobody can pay gas for an unshield) was wrong: paymaster relaying is first-class in STRK20 and AVNU already ships it. Verified against the docs before committing.
 - **Aug 23** — Xenia chosen: claim-link payments to unregistered recipients. StarkWare documented the gap and published an explicitly unofficial, unaudited sketch with no SDK support. Phase ordering confirms register-and-claim fits in one transaction.
 - **Aug 23** — Roles: Sam on contract + chain, teammate on client + delivery.
+
+- **Aug 24** — Contract scaffolded against the frozen §4.1 interface. `sncast` and `snforge` have
+  no Windows binaries and will not build here, so tests run in CI and deploys go through a
+  starknet.js script instead.
+- **Aug 25** — Sepolia rehearsal. It caught four things that would each have cost a mainnet
+  attempt: starknet.js v10 replaced the positional `Account` constructor, Argent v0.4 rejects a
+  bare `[r, s]`, an account with a guardian cannot be scripted at all, and several public RPCs are
+  dead or fail on `estimateFee`.
+- **Aug 25** — §4.4.6's refund check found unimplementable: `privacy_invoke` is always called by
+  the pool, so `get_caller_address()` can never be the sender. Refund is authorised by a signature
+  under its own domain tag instead.
+- **Aug 25** — Answered the open questions by measuring mainnet rather than waiting: registration
+  does bundle but only alongside a deposit; the fee is relayer-fronted and reclaimed from the pool;
+  a dapp can register a user itself via `apply_actions`; sponsorship is used by nobody, 0 of 18.
+- **Aug 25** — The pool's balance invariant makes a zero-balance claim impossible at the protocol
+  level, not the wallet level. `XeniaEscrow` gained opt-in pre-funding, paid out of the escrow
+  rather than the sender's address so no sender-to-recipient edge appears on chain. Two Deposit
+  parameters that were already zero carry it, so the calldata shape did not move.
+- **Aug 26** — Deployed to mainnet and verified on chain. Cost ~10.3 STRK; the declare reserves a
+  ceiling near 21 before it will run.
