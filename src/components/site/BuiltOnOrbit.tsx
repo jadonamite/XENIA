@@ -28,10 +28,10 @@ const NODES: OrbitNode[] = [
 // Concentric discs behind the hub. Each is lifted by its own shadow, which is what turns the
 // bloom into stepped depth instead of one blurred wash.
 const BANDS = [
-  { size: 396, fill: 0.14, rim: 0.5 },
-  { size: 318, fill: 0.16, rim: 0.55 },
-  { size: 242, fill: 0.19, rim: 0.6 },
-  { size: 172, fill: 0.24, rim: 0.68 },
+  { size: 396, fill: 0.14, rim: 0.78 },
+  { size: 318, fill: 0.16, rim: 0.84 },
+  { size: 242, fill: 0.19, rim: 0.9 },
+  { size: 172, fill: 0.24, rim: 0.98 },
 ];
 
 export function BuiltOnOrbit() {
