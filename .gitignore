@@ -22,3 +22,6 @@ contracts/target/
 
 # snforge log written by CI
 contracts/snforge.log
+
+# vercel
+.vercel

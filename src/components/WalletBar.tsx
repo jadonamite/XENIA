@@ -1,6 +1,7 @@
 'use client';
 
 import type { WalletState } from '@/lib/xenia/useWallet';
+import { PillButton } from '@/components/site/Pill';
 
 /**
  * Connection, and an honest read on what the connected wallet can actually do.
@@ -16,9 +17,9 @@ export function WalletBar({ wallet }: { wallet: WalletState }) {
             <div className="note">{wallet.probe?.name ?? 'Connected'}</div>
             <div className="mono">{wallet.address}</div>
           </div>
-          <button className="ghost" onClick={wallet.disconnect}>
+          <PillButton variant="ghost" className="pill-plain" onClick={wallet.disconnect}>
             Disconnect
-          </button>
+          </PillButton>
         </div>
         {wallet.probe && !wallet.probe.supportsStrk20 && (
           <p className="error" style={{ marginBottom: 0 }}>
@@ -39,9 +40,13 @@ export function WalletBar({ wallet }: { wallet: WalletState }) {
       ) : (
         <div className="row">
           {wallet.available.map((w) => (
-            <button key={w.name} disabled={wallet.connecting} onClick={() => wallet.connect(w)}>
+            <PillButton
+              key={w.name}
+              disabled={wallet.connecting}
+              onClick={() => wallet.connect(w)}
+            >
               {wallet.connecting ? 'Connecting…' : `Connect ${w.name}`}
-            </button>
+            </PillButton>
           ))}
         </div>
       )}

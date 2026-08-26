@@ -408,7 +408,16 @@ wallet; a wallet that answers "not implemented" has told us to show a different 
 - After any failed submission, call `invalidateProofNonceCache()` before retrying.
 - The pool address in the STRK20 docs is Sepolia. The mainnet address is in §5.4.
 
-### 5.6 Pages
+### 5.6 Deployment
+
+Live at **https://usexenia.vercel.app** (Vercel, `jadonamites-projects/xenia`, auto-deploys from
+`main`). Deployment protection is off — a judge following the repo's Website field must land on the
+app, not an SSO wall.
+
+`NEXT_PUBLIC_XENIA_ESCROW` is read at build time, so setting it needs a redeploy, not just a
+dashboard save. Sam: post the address and I will set it and redeploy.
+
+### 5.7 Pages
 
 | Route | Purpose |
 |---|---|

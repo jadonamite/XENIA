@@ -31,7 +31,10 @@ export function provider(): RpcProvider {
  * side without updating this is a silently wrong screen, which is why the shape is asserted here.
  */
 export async function readClaim(commitment: string): Promise<ClaimEntry | null> {
-  if (!ESCROW_ADDRESS) return null;
+  if (!ESCROW_ADDRESS) {
+    // Returning null here would render as "no such link", which is a lie about a build problem.
+    throw new Error('This build has no escrow address configured, so links cannot be looked up.');
+  }
   const result = await provider().callContract({
     contractAddress: ESCROW_ADDRESS,
     entrypoint: 'claim_of',
