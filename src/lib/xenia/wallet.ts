@@ -6,6 +6,9 @@
  * object and never register. Reading the registry alone therefore misses most of the field, and
  * the page reports "no wallet detected" to someone who has one installed.
  *
+ * Finding those injected objects is itself a trap: they are usually installed as *non-enumerable*
+ * properties, so `Object.keys(window)` cannot see them. See `injectedWallets` below.
+ *
  * So we register the injected ones ourselves. `StarknetInjectedWallet` wraps an injected object in
  * the Wallet Standard shape, exposing exactly the `standard:connect` and `starknet:walletApi`
  * features the rest of this file expects. After that there is one code path, and `getWallets()`
@@ -20,6 +23,7 @@
 import { getWallets } from '@wallet-standard/app';
 import type { Wallet } from '@wallet-standard/base';
 import { StarknetInjectedWallet } from '@starknet-io/get-starknet-wallet-standard-v6';
+import { readInjected, starknetInjectionKeys } from './injected';
 
 export const STRK20_METHODS = {
   balances: 'wallet_strk20Balances',
@@ -64,11 +68,16 @@ const isInjectedWallet = (value: unknown): value is InjectedWallet => {
   );
 };
 
-/** Extensions inject under their own key — `starknet_ready`, `starknet_braavos`, and so on. */
+/**
+ * Extensions inject under their own key — `starknet_argentX`, `starknet_braavos`, and so on.
+ *
+ * The scan lives in `./injected` so it can be tested without a browser. The short version: those
+ * properties are usually **non-enumerable**, so `Object.keys(window)` cannot see them and the page
+ * reports "no wallet detected" to someone who has several installed.
+ */
 const injectedWallets = (): InjectedWallet[] =>
-  Object.keys(window)
-    .filter((key) => key.startsWith('starknet'))
-    .map((key) => (window as unknown as Record<string, unknown>)[key])
+  starknetInjectionKeys(window)
+    .map((key) => readInjected(window, key))
     .filter(isInjectedWallet);
 
 const wrapped = new Set<string>();
