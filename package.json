@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@starknet-io/get-starknet-wallet-standard-v6": "npm:@starknet-io/get-starknet-wallet-standard@^6.0.4",
     "@wallet-standard/app": "^1.1.1",
     "next": "^15.1.0",
     "qrcode": "^1.5.4",
