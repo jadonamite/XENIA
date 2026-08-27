@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { RpcProvider, WalletAccountV6 } from 'starknet';
-import { MAINNET } from './config';
+import { CHAIN } from './config';
 import { onWalletsChanged, probeWallet, type StarknetWallet, type WalletProbe } from './wallet';
 import type { WalletState } from './useWallet';
 
@@ -15,7 +15,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const provider = useMemo(() => new RpcProvider({ nodeUrl: MAINNET.rpcUrl }), []);
+  const provider = useMemo(() => new RpcProvider({ nodeUrl: CHAIN.rpcUrl }), []);
 
   useEffect(() => onWalletsChanged(setAvailable), []);
 

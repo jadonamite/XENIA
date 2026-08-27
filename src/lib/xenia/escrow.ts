@@ -6,7 +6,7 @@
  */
 
 import { CallData, RpcProvider } from 'starknet';
-import { ESCROW_ADDRESS, MAINNET } from './config';
+import { ESCROW_ADDRESS, CHAIN } from './config';
 
 export interface ClaimEntry {
   token: string;
@@ -21,7 +21,7 @@ export type ClaimStatus = 'unknown' | 'claimable' | 'claimed' | 'expired';
 let cached: RpcProvider | null = null;
 
 export function provider(): RpcProvider {
-  cached ??= new RpcProvider({ nodeUrl: MAINNET.rpcUrl });
+  cached ??= new RpcProvider({ nodeUrl: CHAIN.rpcUrl });
   return cached;
 }
 
