@@ -82,3 +82,22 @@ None of these were visible from a dry run, and each would have cost a mainnet at
 - [ ] `npm run preflight`, then `npm run deploy:dry`, then `npm run deploy`
 - [ ] Verify `privacy_contract()` returns the **mainnet** pool before doing anything else
 - [ ] Record the address in `strk20.json` and `NEXT_PUBLIC_XENIA_ESCROW`
+
+## Funding for the three mainnet transactions — Sam
+
+**The demo transactions are not funded yet, and this is Sam's to do.**
+
+The sprint requires three mainnet transactions through `XeniaEscrow` — create-claim, claim and
+refund. The pool charges **6 STRK per transaction**, so **18 STRK** is the floor, on top of
+whatever each claim itself carries. The deployer was down to **15.99 STRK** after the mainnet
+deploy on 26 Aug, so it is short before the first transaction is attempted.
+
+Both wallets need funding before the run:
+
+| Wallet | Needs |
+|---|---|
+| Sender | 12 STRK of fees (create-claim, refund) plus the claim amount, shielded into the pool |
+| Claimant | 6 STRK of fee, either brought itself or pre-funded through the escrow |
+
+Fund with headroom rather than exactly. A declare reserves a ceiling near 21 STRK before it will
+run, and a transaction that fails on fee has to be repeated in full.

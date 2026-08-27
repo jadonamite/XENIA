@@ -25,3 +25,9 @@ contracts/snforge.log
 
 # vercel
 .vercel
+
+# sprint-internal planning docs — kept locally, not published
+PRD.md
+PROGRESS.md
+DESIGN-PROMPT.md
+contracts/CLIENT-FIXES.md
