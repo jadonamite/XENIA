@@ -41,6 +41,13 @@ export type StarknetWallet = Wallet & {
   features: Record<string, unknown>;
 };
 
+/** A wallet the page can see but cannot drive, and the reason. */
+export interface RejectedWallet {
+  /** The `window` key it was found under, or its registry name. */
+  key: string;
+  reason: string;
+}
+
 export interface WalletProbe {
   wallet: StarknetWallet;
   name: string;
@@ -83,6 +90,21 @@ const injectedWallets = (): InjectedWallet[] =>
 const wrapped = new Set<string>();
 
 /**
+ * Candidates seen but not offered, with the reason.
+ *
+ * Every rejection path below used to end in a silent `continue`, which meant a browser with three
+ * wallets installed and three incompatible could report exactly the same thing as a browser with
+ * none: "no wallet detected". Recording the reason costs nothing and turns an unanswerable bug
+ * report into an obvious one.
+ */
+let rejected: RejectedWallet[] = [];
+
+/** Why the page is not offering a wallet it can nonetheless see. */
+export function rejectedWallets(): RejectedWallet[] {
+  return rejected;
+}
+
+/**
  * Wraps every injected wallet the page can see into the Wallet Standard registry.
  *
  * Idempotent, and skips anything already registered under the same name so a wallet that does both
@@ -92,16 +114,45 @@ export function registerInjectedWallets(): void {
   if (typeof window === 'undefined') return;
   const registry = getWallets();
   const known = new Set(registry.get().map((wallet) => wallet.name));
-  for (const injected of injectedWallets()) {
-    if (wrapped.has(injected.id) || known.has(injected.name)) continue;
+  const found: RejectedWallet[] = [];
+
+  for (const key of starknetInjectionKeys(window)) {
+    const value = readInjected(window, key);
+    if (!value || typeof value !== 'object') continue;
+
+    if (!isInjectedWallet(value)) {
+      // Usually a wallet exposing a different shape than get-starknet's. Name what is missing, so
+      // the gap is diagnosable rather than invisible.
+      const c = value as Record<string, unknown>;
+      const missing = ['id', 'name', 'request', 'on'].filter((f) =>
+        f === 'request' || f === 'on' ? typeof c[f] !== 'function' : typeof c[f] !== 'string',
+      );
+      found.push({ key, reason: `not a get-starknet wallet (missing: ${missing.join(', ')})` });
+      continue;
+    }
+
+    if (wrapped.has(value.id) || known.has(value.name)) continue;
+
     try {
-      registry.register(new StarknetInjectedWallet(injected));
-      wrapped.add(injected.id);
-    } catch {
-      // A wallet that refuses to be wrapped is one we cannot drive. Leave it out rather than
-      // offering a button that fails on click.
+      registry.register(new StarknetInjectedWallet(value));
+      wrapped.add(value.id);
+    } catch (error) {
+      found.push({
+        key,
+        reason: error instanceof Error ? error.message : 'could not be adapted',
+      });
     }
   }
+
+  // Anything registered but lacking the features we drive it through.
+  for (const wallet of registry.get()) {
+    const missing = [CONNECT_FEATURE, WALLET_API_FEATURE].filter((f) => !(f in wallet.features));
+    if (missing.length) {
+      found.push({ key: wallet.name, reason: `missing feature: ${missing.join(', ')}` });
+    }
+  }
+
+  rejected = found;
 }
 
 /** Every Starknet wallet the page can see, injected or self-registered. */
