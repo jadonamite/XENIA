@@ -70,7 +70,7 @@ export default function CreatePage() {
     // claim of at most 4. Warn, and let them decide.
     setWarning(
       token.symbol === 'STRK' && units < POOL_FEE
-        ? `The pool charges ${formatAmount(POOL_FEE, 18)} STRK to redeem a claim, which is more than this claim is worth. Fine for a test; poor value for a real payment.`
+        ? `The pool charges ${formatAmount(POOL_FEE, 18)} STRK to redeem a claim, which is more than this claim is worth.`
         : null,
     );
 
