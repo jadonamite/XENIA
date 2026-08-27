@@ -239,3 +239,49 @@ describe('action lists', () => {
     expect(JSON.stringify(actions)).not.toContain(key.sk.replace(/^0x/, ''));
   });
 });
+
+/**
+ * The exact values `contracts/tests/test_js_interop.cairo` asserts on the Cairo side.
+ *
+ * That suite proves the contract still produces the recorded constants. It cannot prove *this*
+ * side still produces them too — change a domain tag or a hash call in `crypto.ts` and Cairo stays
+ * green while every claim reverts on chain. Asserting the same constants from both languages makes
+ * the check bidirectional: whichever side drifts, one of the two suites goes red.
+ *
+ * Regenerate with `contracts/scripts/js-reference.mjs`.
+ */
+describe('agreement with the deployed contract', () => {
+  const SK = '0x03a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f';
+  const CLAIMANT = '0x048f5f116ba486a079969bdc934846998f0099c11d58874cdb5983a7411addf4';
+
+  /** Compared numerically, since the two sides pad hex differently. */
+  const same = (actual: string, expected: string) => expect(BigInt(actual)).toBe(BigInt(expected));
+
+  it('derives the public key Cairo expects', () => {
+    same(
+      linkKeyFromSecret(SK).pk,
+      '0x6a1061177c2ac48f00771e7b40a46c8f12be1ca9d5d4a9fefb76742e8aee8c4',
+    );
+  });
+
+  it('derives the commitment Cairo expects', () => {
+    same(
+      linkKeyFromSecret(SK).commitment,
+      '0x121e2e8a3e39c976541c4aec0c9ba566dcb1af2d1bc5d473441bbc4851dba2b',
+    );
+  });
+
+  it('builds the claim message Cairo expects', () => {
+    same(
+      claimMessage(linkKeyFromSecret(SK).commitment, CLAIMANT),
+      '0x7b3325e71990a02c3861aec2e7166a7f39e3b703816da209694a2c9bc42f7c1',
+    );
+  });
+
+  it('builds the refund message Cairo expects', () => {
+    same(
+      refundMessage(linkKeyFromSecret(SK).commitment, CLAIMANT),
+      '0x147106a7b6069b7460d6ef016b37e47eb11d7942a12d3ac8d0d1b731f84cf8b',
+    );
+  });
+});
