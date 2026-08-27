@@ -20,6 +20,9 @@ import {
   refundActions,
 } from './actions';
 
+/** The Wallet API rejects a leading zero after `0x`, so expectations use the canonical form. */
+const felt = (value: string) => `0x${BigInt(value).toString(16)}`;
+
 const ALICE = '0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7';
 const MALLORY = '0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
@@ -145,16 +148,16 @@ describe('action lists', () => {
       refundTo: ALICE,
     });
     expect(actions.map((a) => a.type)).toEqual(['withdraw', 'invoke']);
-    expect(withdrawAt(actions, 0).recipient).toBe(escrow);
+    expect(withdrawAt(actions, 0).recipient).toBe(felt(escrow));
     const calldata = invokeAt(actions, 1).calldata;
     expectTenFelts(calldata);
     expect(calldata).toEqual([
       OPERATION.Deposit,
-      '0x11',
-      token,
+      felt('0x11'),
+      felt(token),
       '0x64',
       `0x${(1893456000).toString(16)}`,
-      ALICE,
+      felt(ALICE),
       '0x0', // claimant — the pre-fund recipient, unused here
       '0x0', // sig_r
       '0x0', // sig_s
@@ -175,7 +178,7 @@ describe('action lists', () => {
     const calldata = invokeAt(actions, 1).calldata;
     expectTenFelts(calldata);
     // claimant and note_id, not appended fields — appending would change the length.
-    expect(calldata[6]).toBe(MALLORY);
+    expect(calldata[6]).toBe(felt(MALLORY));
     expect(calldata[9]).toBe('0x9');
   });
 
@@ -183,17 +186,21 @@ describe('action lists', () => {
     const key = generateLinkKey();
     const signature = signClaim(key.sk, key.commitment, ALICE);
     const actions = claimActions({ escrow, token, claimant: ALICE, pk: key.pk, signature });
-    expect(actions[0]).toMatchObject({ type: 'transfer', amount: 'OPEN', recipient: ALICE });
+    expect(actions[0]).toMatchObject({
+      type: 'transfer',
+      amount: 'OPEN',
+      recipient: felt(ALICE),
+    });
     const calldata = invokeAt(actions, 1).calldata;
     expectTenFelts(calldata);
     expect(calldata).toEqual([
       OPERATION.Claim,
-      key.pk,
+      felt(key.pk),
       '0x0', // token — the stored entry wins
       '0x0', // amount
       '0x0', // expiry
       '0x0', // refund_to
-      ALICE,
+      felt(ALICE),
       signature.r,
       signature.s,
       FIRST_OPEN_NOTE,
@@ -207,7 +214,11 @@ describe('action lists', () => {
     // The deposit has to come first: the pool nets each token across the transaction, and the fee
     // withdrawal has nothing to subtract from until it lands.
     expect(actions.map((a) => a.type)).toEqual(['deposit', 'transfer', 'invoke']);
-    expect(actions[0]).toMatchObject({ type: 'deposit', token: FEE.token, amount: FEE.amount });
+    expect(actions[0]).toMatchObject({
+      type: 'deposit',
+      token: felt(FEE.token),
+      amount: felt(FEE.amount),
+    });
     expectTenFelts(invokeAt(actions, 2).calldata);
   });
 
@@ -215,19 +226,23 @@ describe('action lists', () => {
     const key = generateLinkKey();
     const signature = signRefund(key.sk, key.commitment, ALICE);
     const actions = refundActions({ escrow, token, refundTo: ALICE, pk: key.pk, signature });
-    expect(actions[0]).toMatchObject({ type: 'transfer', amount: 'OPEN', recipient: ALICE });
+    expect(actions[0]).toMatchObject({
+      type: 'transfer',
+      amount: 'OPEN',
+      recipient: felt(ALICE),
+    });
     const calldata = invokeAt(actions, 1).calldata;
     expectTenFelts(calldata);
     expect(calldata).toEqual([
       OPERATION.Refund,
-      key.pk,
+      felt(key.pk),
       '0x0',
       '0x0',
       '0x0',
       '0x0',
-      ALICE, // signed as the claimant parameter; refund_to gates nothing
-      signature.r,
-      signature.s,
+      felt(ALICE), // signed as the claimant parameter; refund_to gates nothing
+      felt(signature.r),
+      felt(signature.s),
       FIRST_OPEN_NOTE,
     ]);
   });
@@ -282,6 +297,79 @@ describe('agreement with the deployed contract', () => {
     same(
       refundMessage(linkKeyFromSecret(SK).commitment, CLAIMANT),
       '0x147106a7b6069b7460d6ef016b37e47eb11d7942a12d3ac8d0d1b731f84cf8b',
+    );
+  });
+});
+
+/**
+ * The Wallet API validates every address and amount against
+ * `^0x(0|[a-fA-F1-9]{1}[a-fA-F0-9]{0,62})$` — a leading zero after `0x` is invalid.
+ *
+ * Starknet addresses are published padded to 64 digits almost everywhere, so passing one straight
+ * through is the natural mistake, and the wallet answers `INVALID_REQUEST_PAYLOAD` without the
+ * transaction ever reaching the chain. Nothing about that error says which field was wrong.
+ */
+describe('every value the wallet sees is a valid felt', () => {
+  const FELT = /^0x(0|[a-fA-F1-9][a-fA-F0-9]{0,62})$/;
+  const isPlaceholder = (value: string) => value.startsWith('${');
+
+  const check = (actions: STRK20_ACTION[]) => {
+    for (const action of actions) {
+      for (const [field, value] of Object.entries(action)) {
+        if (field === 'type' || field === 'calldata' || typeof value !== 'string') continue;
+        if (value === 'OPEN' || isPlaceholder(value)) continue;
+        expect(value, `${action.type}.${field}`).toMatch(FELT);
+      }
+      if (action.type === 'invoke') {
+        action.calldata.forEach((entry, i) => {
+          if (typeof entry !== 'string' || isPlaceholder(entry)) return;
+          expect(entry, `calldata[${i}]`).toMatch(FELT);
+        });
+      }
+    }
+  };
+
+  /** STRK's address, exactly as it is published — padded, and therefore rejected unnormalised. */
+  const PADDED = '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d';
+
+  it('normalises padded inputs when creating a claim', () => {
+    check(
+      createClaimActions({
+        escrow: PADDED,
+        token: PADDED,
+        amount: '0x64',
+        commitment: PADDED,
+        expiry: 1893456000,
+        refundTo: PADDED,
+        prefund: { recipient: PADDED, amount: '0x9' },
+      }),
+    );
+  });
+
+  it('normalises padded inputs when claiming, fee deposit included', () => {
+    const key = generateLinkKey();
+    check(
+      claimActions({
+        escrow: PADDED,
+        token: PADDED,
+        claimant: PADDED,
+        pk: key.pk,
+        signature: signClaim(key.sk, key.commitment, PADDED),
+        fee: { token: PADDED, amount: '0x1234' },
+      }),
+    );
+  });
+
+  it('normalises padded inputs when refunding', () => {
+    const key = generateLinkKey();
+    check(
+      refundActions({
+        escrow: PADDED,
+        token: PADDED,
+        refundTo: PADDED,
+        pk: key.pk,
+        signature: signRefund(key.sk, key.commitment, PADDED),
+      }),
     );
   });
 });

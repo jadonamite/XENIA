@@ -36,6 +36,24 @@ export const FIRST_OPEN_NOTE = '${openNoteIds[0]}';
 /** Unused calldata positions. */
 const NONE = '0x0';
 
+/**
+ * Canonical felt: `0x`-prefixed, no leading zeros.
+ *
+ * The Wallet API validates every address and amount against
+ * `^0x(0|[a-fA-F1-9]{1}[a-fA-F0-9]{0,62})$`, which forbids a leading zero after `0x`. Starknet
+ * addresses are routinely written padded to 64 digits — STRK is `0x04718f5a…` everywhere it is
+ * published — and a padded value is rejected with `INVALID_REQUEST_PAYLOAD` before the transaction
+ * reaches the chain. Normalising here lets callers pass either form.
+ */
+const felt = (value: string): string => `0x${BigInt(value).toString(16)}`;
+
+/**
+ * Calldata may carry wallet-resolved placeholders such as `${openNoteIds[0]}`, which are literal
+ * strings the wallet substitutes when it assembles the transaction. Normalising one would destroy
+ * it, so anything starting with `$` is passed through untouched.
+ */
+const item = (value: string): string => (value.startsWith('$') ? value : felt(value));
+
 export interface CreateClaimParams {
   escrow: string;
   token: string;
@@ -65,21 +83,21 @@ export interface CreateClaimParams {
  */
 export function createClaimActions(p: CreateClaimParams): STRK20_ACTION[] {
   return [
-    { type: 'withdraw', token: p.token, amount: p.amount, recipient: p.escrow },
+    { type: 'withdraw', token: felt(p.token), amount: felt(p.amount), recipient: felt(p.escrow) },
     {
       type: 'invoke',
-      contract: p.escrow,
+      contract: felt(p.escrow),
       calldata: [
         OPERATION.Deposit,
-        p.commitment,
-        p.token,
-        p.amount,
+        item(p.commitment),
+        item(p.token),
+        item(p.amount),
         `0x${p.expiry.toString(16)}`,
-        p.refundTo,
-        p.prefund?.recipient ?? NONE,
+        item(p.refundTo),
+        p.prefund ? item(p.prefund.recipient) : NONE,
         NONE, // sig_r — ignored on Deposit
         NONE, // sig_s
-        p.prefund?.amount ?? NONE,
+        p.prefund ? item(p.prefund.amount) : NONE,
       ],
     },
   ];
@@ -124,10 +142,10 @@ export interface ClaimParams {
 export function claimActions(p: ClaimParams): STRK20_ACTION[] {
   return [
     ...settleFee(p.fee),
-    { type: 'transfer', token: p.token, amount: 'OPEN', recipient: p.claimant },
+    { type: 'transfer', token: felt(p.token), amount: 'OPEN', recipient: felt(p.claimant) },
     {
       type: 'invoke',
-      contract: p.escrow,
+      contract: felt(p.escrow),
       calldata: settleCalldata(OPERATION.Claim, p.pk, p.claimant, p.signature),
     },
   ];
@@ -154,17 +172,17 @@ export interface RefundParams {
 export function refundActions(p: RefundParams): STRK20_ACTION[] {
   return [
     ...settleFee(p.fee),
-    { type: 'transfer', token: p.token, amount: 'OPEN', recipient: p.refundTo },
+    { type: 'transfer', token: felt(p.token), amount: 'OPEN', recipient: felt(p.refundTo) },
     {
       type: 'invoke',
-      contract: p.escrow,
+      contract: felt(p.escrow),
       calldata: settleCalldata(OPERATION.Refund, p.pk, p.refundTo, p.signature),
     },
   ];
 }
 
 const settleFee = (fee?: FeeDeposit): STRK20_ACTION[] =>
-  fee ? [{ type: 'deposit', token: fee.token, amount: fee.amount }] : [];
+  fee ? [{ type: 'deposit', token: felt(fee.token), amount: felt(fee.amount) }] : [];
 
 /**
  * Claim and Refund send the same ten felts; only the operation and the signature's domain differ.
@@ -177,13 +195,13 @@ const settleCalldata = (
   signature: ClaimSignature,
 ): string[] => [
   operation,
-  pk, // the PUBLIC KEY; the contract hashes it to find the entry
+  item(pk), // the PUBLIC KEY; the contract hashes it to find the entry
   NONE, // token
   NONE, // amount
   NONE, // expiry
   NONE, // refund_to
-  recipient,
-  signature.r,
-  signature.s,
+  item(recipient),
+  item(signature.r),
+  item(signature.s),
   FIRST_OPEN_NOTE,
 ];
