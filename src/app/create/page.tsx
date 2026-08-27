@@ -19,19 +19,20 @@ import { ClaimLinkCard } from '@/components/ClaimLinkCard';
 import { SlideToPay } from '@/components/app/SlideToPay';
 import { TokenSelect } from '@/components/ui/TokenSelect';
 
-const DAY = 24 * 60 * 60;
+const HOUR = 60 * 60;
+const DAY = 24 * HOUR;
 const EXPIRY_PRESETS = [
-  { label: '1 Day', days: '1' },
-  { label: '3 Days', days: '3' },
-  { label: '7 Days', days: '7' },
-  { label: '30 Days', days: '30' },
+  { label: '1 Hour', seconds: HOUR },
+  { label: '1 Day', seconds: DAY },
+  { label: '7 Days', seconds: 7 * DAY },
+  { label: '30 Days', seconds: 30 * DAY },
 ];
 
 export default function CreatePage() {
   const wallet = useWalletContext();
   const [symbol, setSymbol] = useState(TOKENS[0].symbol as string);
   const [amount, setAmount] = useState('');
-  const [days, setDays] = useState(String(DEFAULT_EXPIRY_SECONDS / DAY));
+  const [expiryWindow, setExpiryWindow] = useState(DEFAULT_EXPIRY_SECONDS);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
@@ -70,7 +71,7 @@ export default function CreatePage() {
       return;
     }
 
-    const expiry = Math.floor(Date.now() / 1000) + Number(days) * DAY;
+    const expiry = Math.floor(Date.now() / 1000) + expiryWindow;
     const key = generateLinkKey();
 
     setBusy(true);
@@ -253,12 +254,12 @@ export default function CreatePage() {
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
             {EXPIRY_PRESETS.map((preset) => {
-              const isSelected = days === preset.days;
+              const isSelected = expiryWindow === preset.seconds;
               return (
                 <button
-                  key={preset.days}
+                  key={preset.seconds}
                   type="button"
-                  onClick={() => setDays(preset.days)}
+                  onClick={() => setExpiryWindow(preset.seconds)}
                   style={{
                     padding: '10px 6px',
                     borderRadius: 12,

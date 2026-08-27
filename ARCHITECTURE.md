@@ -2,7 +2,8 @@
 
 **Pay someone privately who has never touched the privacy pool. They claim from a link, and registration happens inside the claim.**
 
-STRK20 Private Sprint · Aug 14–31 2026 · Team of 2
+Design rationale and the decisions behind it. For usage, integration and reference material,
+see [the documentation](docs/).
 
 ---
 
@@ -184,8 +185,6 @@ Pages: create-claim, claim (the whole product), my-claims (status + refund).
 
 ## 7. What leaks
 
-Put this table in the README verbatim.
-
 | Leak | Status |
 |---|---|
 | Recipient identity, recipient's balance | Hidden |
@@ -193,77 +192,24 @@ Put this table in the README verbatim.
 | Escrow deposit (pool → helper transfer) | **Public.** Observers see the pool paid the helper, not who initiated it |
 | Claim amount | **Public.** Open-note amounts are plaintext by design — measured at execution |
 | Sender's original shield | Public leg, as always |
-| Timing correlation between deposit and claim | Not addressed. Warn in the UI |
+| Timing correlation between deposit and claim | Not addressed |
 | Anyone holding the link | Can claim. It is a bearer instrument |
 
-That last row is a product property, not a bug — but it must be stated in the UI, not buried. Treat the link like cash.
+That last row is a product property, not a bug. Treat the link like cash — full threat model in
+[the privacy model](docs/concepts/privacy-model.md).
 
 ---
 
-## 8. Three mainnet transactions
-
-All three touch the pool; the last two run through `XeniaEscrow`, satisfying the sprint's on-chain check.
-
-1. **Shield** — sender deposits into the pool
-2. **Create claim** — invoke `XeniaEscrow` (Deposit), funds park in the helper
-3. **Claim** — from a genuinely fresh wallet: register + claim in one transaction
-
-Transaction 3 is the demo. Film it from a wallet that has never registered, and show the block explorer before and after.
-
----
-
-## 9. Environment gotchas that will cost a day if missed
+## 8. Environment notes
 
 - **`starknet@^10.4.0`, from the npm `next` tag.** A bare install resolves to 10.0.x, which has none of the STRK20 API — `WalletAccountV6`, `strk20InvokeTransaction` and `STRK20_ACTION` will all be missing. Wallet API `>= 0.10.3` required.
-- **The SDK route is not viable on mainnet** (settled 26 Aug): there is no public proving service,
-  and `ContractDiscoveryProvider` is not exported in `0.14.3-rc.5`, so discovery would need a hosted
-  indexer too. Xenia runs on the Wallet API, which needs neither. The SDK notes below are kept only
-  for anyone revisiting that route. The SDK 404s on npm — it is on GitHub Packages and needs a token
-  even though it is public, and Node >= 24.
-- If we touch the SDK route: `provingBlockId = currentBlock - 10`, `tip: 0n` is mandatory, and `proofDetails` must be **omitted entirely** rather than passed empty — an empty `proofFacts` array serializes an invalid v3 transaction.
 - Notes mature **10 blocks** after creation. The claimed note isn't spendable immediately.
 - The viewing key must be a **bigint**; a hex string silently derives wrong channel keys.
-- After any failed submission, call `invalidateProofNonceCache()` before retrying.
 - Deposits are screened by FPI and the pool verifies the signature on-chain. Our claim is not a deposit, but the sender's shield is.
 - The pool address in the docs is **Sepolia**. Mainnet is
   `0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a` — confirmed, and what the
   deployed escrow points at.
 - **The pool charges 6 STRK per transaction on mainnet** (2 on Sepolia), read live from
   `get_fee_amount()`. The relayer fronts it and reclaims it from the pool, so a claimant needs no
-  public STRK and pays no gas — but the reclaim needs a matching inflow. See §5.2.
-
----
-
-## 10. Day 0 verification — all answered
-
-Every question below is settled. Two of them were answered by measuring mainnet rather than waiting
-for a reply; the working is in `contracts/ONCHAIN-FINDINGS.md`.
-
-- **How is the withdraw leg expressed when the helper returns an empty span?** *This was the one
-  thing I could not confirm from the docs, and it was the only question that could have forced a
-  redesign.* Answered by the sprint team: `withdraw` to the helper followed by `invoke` is valid,
-  and no `"OPEN"` transfer is needed on that leg — but the helper must return a properly
-  ABI-encoded **empty span**, not empty returndata. That is what `XeniaEscrow` returns, and
-  `tests/test_pool_handshake.cairo` proves the round trip.
-
-- **Does the wallet auto-register a brand-new user mid-claim?** **Still open, and the last real
-  unknown.** Registration demonstrably bundles into larger transactions on mainnet today — but every
-  observed case rides alongside a `Deposit`, never a pure receive. Support advises not relying on
-  first-use registration through a dapp call. Plan for two steps; note that a claim carrying
-  pre-funding *is* a shape with money going in, which is the shape observed working.
-
-  If it does not fold in, the fallback stays on our own page: registration is a plain call to the
-  pool's public `apply_actions`, so nobody is sent into a wallet's settings.
-
-- **Mainnet pool address, and which tokens are live.** Pool confirmed at
-  `0x040337b1…812a`. The pool itself has no token allowlist — roughly 30 tokens carry balances —
-  but wallet-level support is narrower, so the `/create` token list should be checked against Ready.
-
-- **Cost of a claim.** 6 STRK per pool transaction on mainnet, read live. Fronted by a relayer and
-  reclaimed from the pool. Claims should be sized well above it.
-
-- **Does the pool reject an invoke returning an empty span with no other outputs?** No — see the
-  first item.
-
-**Kill condition — not triggered.** The escrow pattern works, the contract is deployed to mainnet,
-and the Wallet API route is confirmed available.
+  public STRK and pays no gas — but the reclaim needs a matching inflow. See
+  [fees](docs/concepts/fees.md).

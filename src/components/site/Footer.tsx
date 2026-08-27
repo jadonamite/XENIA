@@ -15,8 +15,8 @@ const COLUMNS = [
     title: 'Build',
     links: [
       { label: 'Repository', href: 'https://github.com/jadonamite/XENIA' },
-      { label: 'Architecture', href: 'https://github.com/jadonamite/XENIA/blob/main/ARCHITECTURE.md' },
-      { label: 'Requirements', href: 'https://github.com/jadonamite/XENIA/blob/main/PRD.md' },
+      { label: 'Documentation', href: 'https://github.com/jadonamite/XENIA/tree/main/docs' },
+      { label: 'Escrow contract', href: 'https://github.com/jadonamite/XENIA/blob/main/docs/integrate/escrow-contract.md' },
     ],
   },
   {

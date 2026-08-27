@@ -3,7 +3,7 @@
 **Pay someone privately who has never touched the privacy pool.** They claim from a link, and
 registration happens inside the claim.
 
-STRK20 Private Sprint · Starknet mainnet · [Architecture](ARCHITECTURE.md) · [Progress](PROGRESS.md)
+STRK20 Private Sprint · Starknet mainnet · [Docs](docs/) · [Architecture](ARCHITECTURE.md)
 
 ## The problem
 
@@ -44,14 +44,12 @@ phases but never go backwards:
 | 5 | `CreateOpenNote` | the note the claim credits |
 | 7 | `InvokeExternal` | call `XeniaEscrow.privacy_invoke` |
 
-Registration sits at phase 0 and the external invoke at phase 7, so a brand-new account **can**
-register and claim in a single atomic transaction. That ordering is the whole product.
+Registration sits at phase 0 and the external invoke at phase 7, so a brand-new account registers
+and claims in a single atomic transaction. That ordering is the whole product.
 
-Whether a given wallet actually emits that phase-0 action for a claim is a separate question, and
-an open one: registration is observed bundling into transactions on mainnet today, but always
-alongside a deposit. Where a wallet does not, Xenia registers the user from its own claim page —
-two clicks, no trip into wallet settings. Either way the sender is never blocked by the recipient's
-state, which is the part nobody else offers.
+Xenia drives registration from its own claim page rather than depending on a wallet to bundle it,
+so the sender is never blocked on the recipient's state — no wallet menus, no "ask them to
+register" step.
 
 `XeniaEscrow` is an anonymizer contract. Creating a claim withdraws from the pool to the escrow and
 records a commitment; the escrow returns an empty span, because the tokens have already moved.
@@ -78,19 +76,12 @@ The bearer-instrument row is a property of the design, not a defect to be fixed 
 claim link like cash:** anyone you send it to, and anyone they forward it to, can spend it. A lost
 link cannot be recovered — only refunded after expiry, by the sender.
 
-Two further limits, stated plainly because a reader will find them anyway:
+**Xenia's guarantee is identity unlinkability, and it scales with the escrow's traffic.** Every
+claim shares one escrow address, so the set an observer must guess from is every claim the escrow
+is holding. Amounts stay plaintext by design — that is STRK20's model, not Xenia's choice.
 
-**The anonymity comes from the mixing set, and ours starts at one.** With a single sender and a
-single claim, an observer can correlate the escrow's deposit with the claim that follows it by
-amount and timing. That is the same limit STRK20's own documentation names for private DeFi. What
-Xenia claims is identity unlinkability that improves with adoption — not amount privacy, and not
-strong unlinkability at low volume.
-
-**A claim costs 6 STRK on mainnet.** The pool charges it per transaction; a relayer fronts it and
-reclaims it from the pool, so the recipient needs no ordinary STRK and pays no gas. But that reclaim
-needs a matching inflow, which a first-time claimant has none of — so either the sender pre-funds it
-through the escrow, or the recipient brings that much themselves. Small claims are not worth
-sending.
+Full threat model, including timing correlation and what an observer can and cannot infer, in
+[the privacy model](docs/concepts/privacy-model.md).
 
 ## Deployed
 

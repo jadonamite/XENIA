@@ -94,7 +94,7 @@ use `encodeShortString('XENIA_CLAIM_V1')` and Poseidon over the felt array.
 
 ## Action lists
 
-**Create a claim** (PRD §5.1):
+**Create a claim**:
 
 ```js
 { type: 'withdraw', token, amount, recipient: XENIA_ESCROW }
@@ -102,7 +102,7 @@ use `encodeShortString('XENIA_CLAIM_V1')` and Poseidon over the felt array.
   calldata: [0, commitment, token, amount, expiry, refundTo, 0, 0, 0, 0] }
 ```
 
-**Claim** (PRD §5.2):
+**Claim**:
 
 ```js
 { type: 'transfer', token, amount: 'OPEN', recipient: claimant }
@@ -141,10 +141,10 @@ fn privacy_contract() -> ContractAddress;
 
 ---
 
-## Deviation from PRD §4.4.6 — refund authorisation
+## Refund authorisation
 
-**PRD §4.4 invariant 6 says refund requires "a caller matching `refund_to`". That check cannot be
-implemented as written, and the contract does something else.**
+**Refund cannot be authorised by caller.** `privacy_invoke` is always called by the pool, so the
+contract authorises by signature instead.
 
 `privacy_invoke` is always called *by the privacy pool*, so `get_caller_address()` is the pool's
 address on every path, including refund. The sender's own address never reaches the contract —
@@ -168,8 +168,7 @@ The alternative — a direct ERC-20 transfer to `refund_to` with an empty span �
 but it publishes the sender's address next to the escrow and contradicts ARCHITECTURE §4, which
 specifies the refund credits "the sender's own open note".
 
-**Decided 26 Aug: the signature approach stands.** PRD §4.4.6 and the §4.7 test have been reworded
-to match. Mainnet traces settled it — private transactions are submitted by rotating relayers, so
+**Decided 26 Aug: the signature approach stands.** Mainnet traces settled it — private transactions are submitted by rotating relayers, so
 even the transaction sender is not the user, and no caller-based check could ever work.
 
 ---

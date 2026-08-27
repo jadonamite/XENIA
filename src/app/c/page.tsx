@@ -152,11 +152,6 @@ export default function ClaimPage() {
                 Connect any Starknet wallet. If you have never used private balances before, the
                 same transaction sets you up — there is no separate step.
               </p>
-              <p className="note">
-                The pool charges {formatAmount(POOL_FEE, 18)} STRK per transaction and requires it
-                to be funded from inside the same transaction, so your wallet needs that much STRK
-                to claim. It is the protocol&rsquo;s fee, not ours.
-              </p>
               <WalletBar wallet={wallet} />
               {error && <p className="error">{error}</p>}
               <div className="row" style={{ marginTop: 16 }}>
