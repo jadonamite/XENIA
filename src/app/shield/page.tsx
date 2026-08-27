@@ -8,6 +8,7 @@ import { NETWORK, POOL_FEE, TOKENS, tokenBySymbol } from '@/lib/xenia/config';
 import { useWalletContext } from '@/lib/xenia/WalletContext';
 import { SlideToPay } from '@/components/app/SlideToPay';
 import { TokenSelect } from '@/components/ui/TokenSelect';
+import { WalletBar } from '@/components/WalletBar';
 
 /**
  * Moving public funds into the privacy pool.
@@ -27,6 +28,7 @@ export default function ShieldPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [needsRegistration, setNeedsRegistration] = useState(false);
 
   const token = tokenBySymbol(symbol) ?? TOKENS[0];
   const feeInStrk = Number(POOL_FEE) / 1e18;
@@ -34,6 +36,7 @@ export default function ShieldPage() {
   async function shield() {
     setError(null);
     setTxHash(null);
+    setNeedsRegistration(false);
 
     if (!wallet.account) {
       setError('Connect a wallet first.');
@@ -60,7 +63,11 @@ export default function ShieldPage() {
       setTxHash(transaction_hash);
       setAmount('');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'The wallet rejected the transaction.');
+      const message = cause instanceof Error ? cause.message : String(cause);
+      // The pool refuses to hold funds for an account with no viewing key on chain. Nothing the
+      // app can do about it: the Wallet API exposes no way to register, so the wallet has to.
+      if (/NOT_REGISTERED/i.test(message)) setNeedsRegistration(true);
+      else setError(message || 'The wallet rejected the transaction.');
     } finally {
       setBusy(false);
     }
@@ -80,6 +87,28 @@ export default function ShieldPage() {
         inside, so this comes first. <strong>This step is public</strong> — your address, the token
         and the amount are all visible. What happens afterwards is not.
       </p>
+
+      <div style={{ marginBottom: 16 }}>
+        <WalletBar wallet={wallet} />
+      </div>
+
+      {needsRegistration && (
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <p className="note" style={{ margin: 0, fontWeight: 600 }}>
+            This account has not registered with the pool yet.
+          </p>
+          <p className="note" style={{ marginTop: 8, marginBottom: 0 }}>
+            Registering publishes a viewing key on chain, and only the account itself can do it —
+            the Wallet API exposes no method for it, so it has to happen in your wallet. In Ready,
+            open its privacy or shielded-balance section and complete the one-time setup, then come
+            back and shield.
+          </p>
+          <p className="note" style={{ marginTop: 8, marginBottom: 0, opacity: 0.75 }}>
+            This is the same wall Xenia exists to remove for <em>recipients</em> — a sender still
+            has to cross it once.
+          </p>
+        </div>
+      )}
 
       <div className="panel" style={{ marginTop: 20 }}>
         <TokenSelect value={symbol} onChange={setSymbol} />

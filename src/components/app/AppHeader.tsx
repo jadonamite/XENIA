@@ -52,6 +52,22 @@ export function AppHeader() {
             }}
           >
             <Link
+              href="/shield"
+              style={{
+                padding: '6px 16px',
+                borderRadius: 9999,
+                fontSize: 13.5,
+                fontWeight: 500,
+                textDecoration: 'none',
+                background: pathname === '/shield' ? 'var(--card-raised)' : 'transparent',
+                color: pathname === '/shield' ? 'var(--ink)' : 'var(--ink-2)',
+                boxShadow: pathname === '/shield' ? '0 1px 4px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 200ms ease',
+              }}
+            >
+              Send
+            </Link>
+            <Link
               href="/create"
               style={{
                 padding: '6px 16px',
