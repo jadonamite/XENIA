@@ -130,11 +130,43 @@ Invariants:
 
 1. `privacy_invoke` **asserts the caller is the privacy pool** — the reference escrow does this and it is non-negotiable; nobody drives the escrow directly.
 2. Deposit returns an **empty span**. Tokens stay parked; there is nothing to credit yet.
-3. Claim recomputes the commitment **from the secret preimage** and ignores any passed-in hash.
+3. Claim recomputes the commitment **from the link public key** and ignores any passed-in hash. (The design moved from a bare secret to a keypair — see §5.1.)
 4. `claimed` flips exactly once. A second claim reverts.
-5. Refund requires `expiry` passed **and** `refund_to` to match; refund and claim are mutually exclusive by the same flag.
-6. Domain-separated commitment tag, so our hashes cannot collide with anything else.
-7. The escrow **approves** the pool to pull — it never transfers directly. This is the documented rule of the pattern.
+5. Refund requires `expiry` passed **and a signature under a refund-specific domain tag**; refund and claim are mutually exclusive by the same flag.
+
+   > **Corrected 26 Aug.** This said `refund_to` must match the caller. That cannot be implemented:
+   > `privacy_invoke` is always called by the pool, so `get_caller_address()` is the pool's address
+   > on every path — and mainnet traces show private transactions are submitted by rotating
+   > relayers, so even the transaction sender is not the user. `refund_to` is stored and emitted
+   > for the `/claims` UI but gates nothing.
+6. Domain-separated tags throughout — separate ones for the commitment, the claim message and the
+   refund message, so a signature for one can never be replayed as another.
+7. The escrow **approves** the pool to pull — it never transfers directly for the credited note.
+   This is the documented rule of the pattern. (The one direct transfer it makes is the optional
+   pre-funding of a claimant, which is not a credited note — see §5.2.)
+
+### 5.1 Link keys, not bare secrets
+
+The reference escrow authorises a claim with a raw preimage. That preimage sits in public calldata,
+so anyone watching the mempool can lift it and redirect the claim to themselves. Xenia's link
+carries a **private key** instead: the commitment is `poseidon(TAG, pk)`, and claiming means signing
+the claimant's own address with `sk`. A copied signature authorises an address the thief does not
+control.
+
+The link remains a bearer instrument — whoever holds it can claim. What they cannot do is steal a
+claim already in flight.
+
+### 5.2 Pre-funding, and why it exists
+
+A first-time claimant cannot pay the pool fee. The relayer fronts it and reclaims it with a
+`withdraw`, and the pool's balance invariant demands an inflow to match that withdrawal — which
+someone holding nothing inside the pool cannot supply. The transaction is refused **by the protocol,
+not by the wallet**.
+
+So a deposit can optionally send the claimant the fee ahead of time, out of the escrow. It must come
+from the escrow rather than the sender's own address: funding the claimant directly would put a
+public sender → claimant edge on chain, which is the one thing Xenia exists to hide. Working in
+`contracts/ONCHAIN-FINDINGS.md`.
 
 ---
 
@@ -183,22 +215,55 @@ Transaction 3 is the demo. Film it from a wallet that has never registered, and 
 ## 9. Environment gotchas that will cost a day if missed
 
 - **`starknet@^10.4.0`, from the npm `next` tag.** A bare install resolves to 10.0.x, which has none of the STRK20 API — `WalletAccountV6`, `strk20InvokeTransaction` and `STRK20_ACTION` will all be missing. Wallet API `>= 0.10.3` required.
-- **The SDK 404s on npm.** It's on GitHub Packages and needs a token even though it's public, or install straight from git at a commit. Node >= 24.
+- **The SDK route is not viable on mainnet** (settled 26 Aug): there is no public proving service,
+  and `ContractDiscoveryProvider` is not exported in `0.14.3-rc.5`, so discovery would need a hosted
+  indexer too. Xenia runs on the Wallet API, which needs neither. The SDK notes below are kept only
+  for anyone revisiting that route. The SDK 404s on npm — it is on GitHub Packages and needs a token
+  even though it is public, and Node >= 24.
 - If we touch the SDK route: `provingBlockId = currentBlock - 10`, `tip: 0n` is mandatory, and `proofDetails` must be **omitted entirely** rather than passed empty — an empty `proofFacts` array serializes an invalid v3 transaction.
 - Notes mature **10 blocks** after creation. The claimed note isn't spendable immediately.
 - The viewing key must be a **bigint**; a hex string silently derives wrong channel keys.
 - After any failed submission, call `invalidateProofNonceCache()` before retrying.
 - Deposits are screened by FPI and the pool verifies the signature on-chain. Our claim is not a deposit, but the sender's shield is.
-- The pool address in the docs is **Sepolia**. Confirm mainnet separately.
+- The pool address in the docs is **Sepolia**. Mainnet is
+  `0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a` — confirmed, and what the
+  deployed escrow points at.
+- **The pool charges 6 STRK per transaction on mainnet** (2 on Sepolia), read live from
+  `get_fee_amount()`. The relayer fronts it and reclaims it from the pool, so a claimant needs no
+  public STRK and pays no gas — but the reclaim needs a matching inflow. See §5.2.
 
 ---
 
-## 10. Day 0 verification — resolve before writing Cairo
+## 10. Day 0 verification — all answered
 
-- [ ] **How is the withdraw leg to the helper expressed in the Wallet API action list** when the helper returns an empty span and no open note is created? The swap example always pairs a `"OPEN"` transfer with the invoke; our deposit path has no output note. **This is the one thing I could not confirm from the docs.** Ask in the Telegram group.
-- [ ] Does the connected wallet auto-register a brand-new user on `strk20InvokeTransaction`, or do we need an explicit register action / the SDK route for the claim?
-- [ ] Mainnet pool address, and which tokens are live on it
-- [ ] Cost of a claim transaction in STRK (sets whether tiny claims are viable)
-- [ ] Does the pool reject an invoke whose helper returns an empty span in a transaction that has no other outputs?
+Every question below is settled. Two of them were answered by measuring mainnet rather than waiting
+for a reply; the working is in `contracts/ONCHAIN-FINDINGS.md`.
 
-**Kill condition:** none of these should be fatal — the escrow pattern is documented working code. If the Wallet API can't express the deposit leg, fall back to the SDK route with an app-held account for the sender side. Establish which by end of Day 0.
+- **How is the withdraw leg expressed when the helper returns an empty span?** *This was the one
+  thing I could not confirm from the docs, and it was the only question that could have forced a
+  redesign.* Answered by the sprint team: `withdraw` to the helper followed by `invoke` is valid,
+  and no `"OPEN"` transfer is needed on that leg — but the helper must return a properly
+  ABI-encoded **empty span**, not empty returndata. That is what `XeniaEscrow` returns, and
+  `tests/test_pool_handshake.cairo` proves the round trip.
+
+- **Does the wallet auto-register a brand-new user mid-claim?** **Still open, and the last real
+  unknown.** Registration demonstrably bundles into larger transactions on mainnet today — but every
+  observed case rides alongside a `Deposit`, never a pure receive. Support advises not relying on
+  first-use registration through a dapp call. Plan for two steps; note that a claim carrying
+  pre-funding *is* a shape with money going in, which is the shape observed working.
+
+  If it does not fold in, the fallback stays on our own page: registration is a plain call to the
+  pool's public `apply_actions`, so nobody is sent into a wallet's settings.
+
+- **Mainnet pool address, and which tokens are live.** Pool confirmed at
+  `0x040337b1…812a`. The pool itself has no token allowlist — roughly 30 tokens carry balances —
+  but wallet-level support is narrower, so the `/create` token list should be checked against Ready.
+
+- **Cost of a claim.** 6 STRK per pool transaction on mainnet, read live. Fronted by a relayer and
+  reclaimed from the pool. Claims should be sized well above it.
+
+- **Does the pool reject an invoke returning an empty span with no other outputs?** No — see the
+  first item.
+
+**Kill condition — not triggered.** The escrow pattern works, the contract is deployed to mainnet,
+and the Wallet API route is confirmed available.
