@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RpcProvider, WalletAccountV6 } from 'starknet';
-import { MAINNET } from './config';
+import { CHAIN } from './config';
 import { onWalletsChanged, probeWallet, type StarknetWallet, type WalletProbe } from './wallet';
 
 export interface WalletState {
@@ -30,7 +30,7 @@ export function useWallet(): WalletState {
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const provider = useMemo(() => new RpcProvider({ nodeUrl: MAINNET.rpcUrl }), []);
+  const provider = useMemo(() => new RpcProvider({ nodeUrl: CHAIN.rpcUrl }), []);
 
   useEffect(() => onWalletsChanged(setAvailable), []);
 
