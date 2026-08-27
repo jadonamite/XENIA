@@ -18,6 +18,7 @@ import {
   FIRST_OPEN_NOTE,
   OPERATION,
   refundActions,
+  shieldActions,
 } from './actions';
 
 /** The Wallet API rejects a leading zero after `0x`, so expectations use the canonical form. */
@@ -371,5 +372,15 @@ describe('every value the wallet sees is a valid felt', () => {
         signature: signRefund(key.sk, key.commitment, PADDED),
       }),
     );
+  });
+});
+
+describe('shielding', () => {
+  it('is a single deposit action, with the felt normalised', () => {
+    const PADDED = '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d';
+    const actions = shieldActions({ token: PADDED, amount: '0x64' });
+    expect(actions).toEqual([
+      { type: 'deposit', token: `0x${BigInt(PADDED).toString(16)}`, amount: '0x64' },
+    ]);
   });
 });

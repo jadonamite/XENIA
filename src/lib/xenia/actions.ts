@@ -205,3 +205,26 @@ const settleCalldata = (
   item(signature.s),
   FIRST_OPEN_NOTE,
 ];
+
+export interface ShieldParams {
+  token: string;
+  /** Smallest unit of the token. */
+  amount: string;
+}
+
+/**
+ * Moving public funds into the pool — the step every other flow depends on.
+ *
+ * Xenia sends money that is already inside the pool, so a sender with nothing shielded cannot
+ * create a claim at all. This is the one action that gets it there.
+ *
+ * A deposit is always to self, needs no proof, and carries no attestation of its own: the wallet
+ * obtains the compliance screening the pool verifies on-chain. So it is a single action, and the
+ * simplest transaction in the protocol.
+ *
+ * Public by design. The depositing address, the token and the amount are all visible — what stays
+ * private is what happens afterwards.
+ */
+export function shieldActions(p: ShieldParams): STRK20_ACTION[] {
+  return [{ type: 'deposit', token: felt(p.token), amount: felt(p.amount) }];
+}

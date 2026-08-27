@@ -1,0 +1,130 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { shieldActions } from '@/lib/xenia/actions';
+import { parseAmount, toHex } from '@/lib/xenia/amount';
+import { NETWORK, POOL_FEE, TOKENS, tokenBySymbol } from '@/lib/xenia/config';
+import { useWalletContext } from '@/lib/xenia/WalletContext';
+import { SlideToPay } from '@/components/app/SlideToPay';
+import { TokenSelect } from '@/components/ui/TokenSelect';
+
+/**
+ * Moving public funds into the privacy pool.
+ *
+ * Every other page assumes the sender already has a private balance — creating a claim withdraws
+ * from the pool, and you cannot withdraw what was never deposited. Without this step the app is
+ * unusable on a fresh account, and the alternative was sending people to third-party tooling that
+ * may or may not target the same network.
+ *
+ * Deliberately plain: a deposit is one action, needs no proof, and the wallet obtains the
+ * compliance screening the pool verifies on chain.
+ */
+export default function ShieldPage() {
+  const wallet = useWalletContext();
+  const [symbol, setSymbol] = useState(TOKENS[0].symbol as string);
+  const [amount, setAmount] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [txHash, setTxHash] = useState<string | null>(null);
+
+  const token = tokenBySymbol(symbol) ?? TOKENS[0];
+  const feeInStrk = Number(POOL_FEE) / 1e18;
+
+  async function shield() {
+    setError(null);
+    setTxHash(null);
+
+    if (!wallet.account) {
+      setError('Connect a wallet first.');
+      return;
+    }
+
+    let units: bigint;
+    try {
+      units = parseAmount(amount, token.decimals);
+    } catch {
+      setError('Enter a valid amount.');
+      return;
+    }
+    if (units <= 0n) {
+      setError('Enter an amount above zero.');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { transaction_hash } = await wallet.account.strk20InvokeTransaction(
+        shieldActions({ token: token.address, amount: toHex(units) }),
+      );
+      setTxHash(transaction_hash);
+      setAmount('');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The wallet rejected the transaction.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="app" style={{ maxWidth: 520, padding: '36px 20px 80px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <h1 style={{ margin: 0, fontSize: 22 }}>Shield</h1>
+        <Link href="/create" className="note">
+          Create a link →
+        </Link>
+      </div>
+
+      <p className="note" style={{ marginTop: 0 }}>
+        Moves funds from your wallet into the privacy pool. Xenia sends money that is already
+        inside, so this comes first. <strong>This step is public</strong> — your address, the token
+        and the amount are all visible. What happens afterwards is not.
+      </p>
+
+      <div className="panel" style={{ marginTop: 20 }}>
+        <TokenSelect value={symbol} onChange={setSymbol} />
+
+        <label className="note" style={{ display: 'block', margin: '18px 0 6px' }}>
+          Amount
+        </label>
+        <input
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+          inputMode="decimal"
+          placeholder="0.0"
+          style={{ width: '100%', padding: '12px 14px', fontSize: 16, borderRadius: 10 }}
+        />
+
+        <p className="note" style={{ marginTop: 14, opacity: 0.8 }}>
+          The pool charges {feeInStrk} STRK per transaction on {NETWORK}. Shield comfortably more
+          than you intend to send, so the claim and its fee both fit.
+        </p>
+
+        {error && (
+          <p className="note" style={{ color: 'var(--bad, #b3261e)', marginTop: 12 }}>
+            {error}
+          </p>
+        )}
+
+        {txHash && (
+          <p className="note" style={{ marginTop: 12 }}>
+            Shielded. Transaction <code>{txHash.slice(0, 14)}…</code> — once it confirms, you can{' '}
+            <Link href="/create">create a link</Link>.
+          </p>
+        )}
+
+        <div style={{ marginTop: 18 }}>
+          <SlideToPay
+            onSuccess={shield}
+            disabled={!wallet.account || !amount}
+            loading={busy}
+            label="Slide to shield"
+            loadingLabel="Waiting for wallet…"
+            disabledLabel={wallet.account ? 'Enter an amount' : 'Connect a wallet'}
+          />
+        </div>
+
+      </div>
+    </main>
+  );
+}
