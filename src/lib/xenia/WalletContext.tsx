@@ -103,7 +103,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const connected = await WalletAccountV6.connect(provider, wallet as any);
         setAccount(connected);
-        setProbe(await probeWallet(wallet));
+        // Deliberately not probing here. `wallet_strk20Balances` makes Ready ask permission to
+        // share shielded assets, and doing that on a silent restore means a consent modal on every
+        // single page load — for a capability check the user never asked for. The probe runs on an
+        // explicit connect, where a prompt is expected, and its answer does not change on reload.
       } catch {
         // Approval revoked, or the wallet is locked. Forget it and show the picker, silently —
         // this was not something the user asked for, so it should not surface as an error.

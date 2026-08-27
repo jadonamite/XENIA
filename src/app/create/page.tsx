@@ -35,6 +35,7 @@ export default function CreatePage() {
   const [expiryWindow, setExpiryWindow] = useState(DEFAULT_EXPIRY_SECONDS);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
 
   const token = tokenBySymbol(symbol) ?? TOKENS[0];
@@ -42,6 +43,7 @@ export default function CreatePage() {
 
   async function create() {
     setError(null);
+    setWarning(null);
     if (!wallet.account) {
       setError('Please connect your Starknet wallet first.');
       return;
@@ -62,14 +64,15 @@ export default function CreatePage() {
       setError('Enter an amount above zero.');
       return;
     }
-    // The pool charges its fee in STRK, per transaction, on the claim as well as on this one. A
-    // claim worth less than the fee to redeem it is not worth sending.
-    if (token.symbol === 'STRK' && units < POOL_FEE) {
-      setError(
-        `The pool charges ${formatAmount(POOL_FEE, 18)} STRK to redeem a claim. Send more than that, or the recipient pays more than they receive.`,
-      );
-      return;
-    }
+    // A claim worth less than the fee to redeem it is a poor deal, but it is not invalid — and
+    // refusing it outright blocks the case where the sender's own balance cannot stretch further.
+    // The pool charges its fee on this transaction too, so a sender holding 10 STRK can create a
+    // claim of at most 4. Warn, and let them decide.
+    setWarning(
+      token.symbol === 'STRK' && units < POOL_FEE
+        ? `The pool charges ${formatAmount(POOL_FEE, 18)} STRK to redeem a claim, which is more than this claim is worth. Fine for a test; poor value for a real payment.`
+        : null,
+    );
 
     const expiry = Math.floor(Date.now() / 1000) + expiryWindow;
     const key = generateLinkKey();
@@ -287,6 +290,16 @@ export default function CreatePage() {
         </div>
 
         {/* Error message */}
+        {warning && (
+
+          <p className="note" style={{ color: 'var(--warn, #8a6100)', marginTop: 12 }}>
+
+            {warning}
+
+          </p>
+
+        )}
+
         {error && (
           <div
             style={{
