@@ -1,6 +1,7 @@
 'use client';
 
 import type { WalletState } from '@/lib/xenia/useWallet';
+import { rejectedWallets } from '@/lib/xenia/wallet';
 import { PillButton } from '@/components/site/Pill';
 
 /**
@@ -31,12 +32,26 @@ export function WalletBar({ wallet }: { wallet: WalletState }) {
     );
   }
 
+  const rejected = wallet.available.length === 0 ? rejectedWallets() : [];
+
   return (
     <div className="panel">
       {wallet.available.length === 0 ? (
-        <p className="note" style={{ margin: 0 }}>
-          No Starknet wallet detected in this browser.
-        </p>
+        <div>
+          <p className="note" style={{ margin: 0 }}>
+            No Starknet wallet detected in this browser.
+          </p>
+          {/*
+            A wallet that is present but cannot be driven used to look exactly like no wallet at
+            all. Saying which one and why turns an unanswerable report into an obvious one.
+          */}
+          {rejected.length > 0 && (
+            <p className="note" style={{ margin: '8px 0 0', opacity: 0.75 }}>
+              Found, but not usable:{' '}
+              {rejected.map((r) => `${r.key} (${r.reason})`).join('; ')}
+            </p>
+          )}
+        </div>
       ) : (
         <div className="row">
           {wallet.available.map((w) => (
