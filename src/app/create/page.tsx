@@ -4,7 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { createClaimActions } from '@/lib/xenia/actions';
 import { formatAmount, parseAmount, toHex } from '@/lib/xenia/amount';
-import { DEFAULT_EXPIRY_SECONDS, ESCROW_ADDRESS, TOKENS, tokenBySymbol } from '@/lib/xenia/config';
+import {
+  DEFAULT_EXPIRY_SECONDS,
+  ESCROW_ADDRESS,
+  POOL_FEE,
+  TOKENS,
+  tokenBySymbol,
+} from '@/lib/xenia/config';
 import { generateLinkKey } from '@/lib/xenia/crypto';
 import { buildClaimLink } from '@/lib/xenia/link';
 import { saveClaim } from '@/lib/xenia/store';
@@ -32,8 +38,6 @@ export default function CreatePage() {
 
   const token = tokenBySymbol(symbol) ?? TOKENS[0];
 
-  const parsedValue = parseFloat(amount || '0');
-  const usdValue = (parsedValue * (token.symbol === 'STRK' ? 0.45 : token.symbol === 'ETH' ? 2800 : 1.0)).toFixed(2);
 
   async function create() {
     setError(null);
@@ -55,6 +59,14 @@ export default function CreatePage() {
     }
     if (units <= 0n) {
       setError('Enter an amount above zero.');
+      return;
+    }
+    // The pool charges its fee in STRK, per transaction, on the claim as well as on this one. A
+    // claim worth less than the fee to redeem it is not worth sending.
+    if (token.symbol === 'STRK' && units < POOL_FEE) {
+      setError(
+        `The pool charges ${formatAmount(POOL_FEE, 18)} STRK to redeem a claim. Send more than that, or the recipient pays more than they receive.`,
+      );
       return;
     }
 
@@ -218,51 +230,18 @@ export default function CreatePage() {
               <TokenSelect value={symbol} onChange={setSymbol} />
             </div>
 
-            {/* Bottom Row: USD Equivalent & Balance / MAX */}
+            {/* What the pool takes, stated where the number is entered rather than buried */}
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
                 marginTop: 14,
                 paddingTop: 10,
                 borderTop: '1px solid var(--hairline)',
-                fontSize: 13,
-                color: 'var(--ink-2)',
+                fontSize: 12.5,
+                color: 'var(--ink-3)',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>≈ ${usdValue} USD</span>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>
-                  Balance: {wallet.account ? '100.00' : '—'} {token.symbol}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setAmount('25')}
-                  style={{
-                    padding: '3px 10px',
-                    borderRadius: 9999,
-                    border: '1px solid rgba(19, 145, 226, 0.25)',
-                    background: 'rgba(19, 145, 226, 0.1)',
-                    color: 'var(--accent)',
-                    fontSize: 11.5,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    transition: 'all 160ms ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(19, 145, 226, 0.18)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(19, 145, 226, 0.1)';
-                  }}
-                >
-                  MAX
-                </button>
-              </div>
+              Paid out of your private balance. Redeeming costs the recipient the pool&rsquo;s{' '}
+              {formatAmount(POOL_FEE, 18)} STRK transaction fee.
             </div>
           </div>
         </div>
@@ -300,7 +279,9 @@ export default function CreatePage() {
             })}
           </div>
           <p className="note" style={{ marginTop: 6, fontSize: 12, color: 'var(--ink-3)' }}>
-            Unclaimed funds auto-refund exclusively to your address upon expiration.
+            After it expires the money stops being claimable and you can reclaim it from My Links.
+            It is not automatic, and the link stays a bearer instrument — anyone still holding it
+            can sweep an expired claim, so treat expiry as a deadline, not a lock.
           </p>
         </div>
 

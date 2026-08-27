@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { refundActions } from '@/lib/xenia/actions';
-import { formatAmount } from '@/lib/xenia/amount';
-import { ESCROW_ADDRESS } from '@/lib/xenia/config';
+import { formatAmount, toHex } from '@/lib/xenia/amount';
+import { ESCROW_ADDRESS, POOL_FEE, POOL_FEE_TOKEN } from '@/lib/xenia/config';
 import { buildClaimLink } from '@/lib/xenia/link';
+import { signRefund } from '@/lib/xenia/crypto';
 import { readClaim, statusOf, type ClaimStatus } from '@/lib/xenia/escrow';
 import { forgetClaim, loadClaims, type StoredClaim } from '@/lib/xenia/store';
 import { tokenBySymbol } from '@/lib/xenia/config';
@@ -59,12 +60,18 @@ export default function ClaimsPage() {
     }
     setBusy(claim.commitment);
     try {
+      // The contract cannot see who sent a refund — the pool is always its caller — so a refund is
+      // authorised the same way a claim is: by a signature under the link key, over the address
+      // being paid, under the refund domain tag.
+      const signature = signRefund(claim.sk, claim.commitment, wallet.account.address);
       await wallet.account.strk20InvokeTransaction(
         refundActions({
           escrow: ESCROW_ADDRESS,
           token: claim.tokenAddress,
           refundTo: wallet.account.address,
           pk: claim.pk,
+          signature,
+          fee: { token: POOL_FEE_TOKEN, amount: toHex(POOL_FEE) },
         }),
       );
       await load();

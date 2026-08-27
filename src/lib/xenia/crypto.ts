@@ -20,6 +20,15 @@ import { ec, hash, shortString } from 'starknet';
 /** Domain separation, so Xenia commitments cannot collide with another protocol's hashes. */
 export const COMMITMENT_TAG = shortString.encodeShortString('XENIA_COMMITMENT_V1');
 export const CLAIM_TAG = shortString.encodeShortString('XENIA_CLAIM_V1');
+/**
+ * Refunds are authorised the same way claims are, under their own tag.
+ *
+ * `privacy_invoke` is always called by the pool, so `get_caller_address()` is the pool on every
+ * path and the contract can never learn who initiated a refund. Proving possession of the link key
+ * is the only authorisation available to it. The separate tag is what keeps a claim signature from
+ * being replayed as a refund, and vice versa.
+ */
+export const REFUND_TAG = shortString.encodeShortString('XENIA_REFUND_V1');
 
 export interface LinkKey {
   /** The private key. Lives in the URL fragment and nowhere else. */
@@ -90,6 +99,23 @@ export function signClaim(sk: string, commitment: string, claimant: string): Cla
   return { r: hexOf(signature.r), s: hexOf(signature.s) };
 }
 
+/**
+ * The message a refunder signs. The same shape as `claimMessage`, under a different tag.
+ *
+ * Note what this means: `refund_to` is display metadata, not an access check. Anyone still holding
+ * the link can sweep it after expiry — but they could have claimed it before expiry anyway, so it
+ * grants no capability they did not already have.
+ */
+export function refundMessage(commitment: string, refunder: string): string {
+  return hexOf(hash.computePoseidonHashOnElements([REFUND_TAG, hexOf(commitment), hexOf(refunder)]));
+}
+
+/** Signs a refund for one specific address. */
+export function signRefund(sk: string, commitment: string, refunder: string): ClaimSignature {
+  const signature = ec.starkCurve.sign(refundMessage(commitment, refunder), hexOf(sk));
+  return { r: hexOf(signature.r), s: hexOf(signature.s) };
+}
+
 const compactSignature = ({ r, s }: ClaimSignature): string =>
   r.replace(/^0x/, '').padStart(64, '0') + s.replace(/^0x/, '').padStart(64, '0');
 
@@ -109,6 +135,20 @@ export function verifyClaim(
   const message = claimMessage(commitment, claimant);
   try {
     return ec.starkCurve.verify(compactSignature(signature), message, hexOf(fullPk));
+  } catch {
+    return false;
+  }
+}
+
+/** Local mirror of the contract's refund check. See `verifyClaim`. */
+export function verifyRefund(
+  fullPk: string,
+  commitment: string,
+  refunder: string,
+  signature: ClaimSignature,
+): boolean {
+  try {
+    return ec.starkCurve.verify(compactSignature(signature), refundMessage(commitment, refunder), hexOf(fullPk));
   } catch {
     return false;
   }

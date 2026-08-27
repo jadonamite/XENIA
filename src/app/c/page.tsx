@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { claimActions } from '@/lib/xenia/actions';
-import { formatAmount } from '@/lib/xenia/amount';
-import { ESCROW_ADDRESS, TOKENS } from '@/lib/xenia/config';
+import { formatAmount, toHex } from '@/lib/xenia/amount';
+import { ESCROW_ADDRESS, POOL_FEE, POOL_FEE_TOKEN, TOKENS } from '@/lib/xenia/config';
 import { signClaim, type LinkKey } from '@/lib/xenia/crypto';
 import { readClaimFromLocation } from '@/lib/xenia/link';
 import { readClaim, statusOf, type ClaimEntry } from '@/lib/xenia/escrow';
@@ -63,6 +63,10 @@ export default function ClaimPage() {
           claimant: wallet.account.address,
           pk: key.pk,
           signature,
+          // The pool reimburses its fee with a withdrawal, and every token has to net zero across
+          // the transaction. Someone claiming for the first time has nothing inside the pool for
+          // that withdrawal to come out of, so the fee rides in as a deposit here.
+          fee: { token: POOL_FEE_TOKEN, amount: toHex(POOL_FEE) },
         }),
       );
       setTxHash(transaction_hash);
@@ -147,6 +151,11 @@ export default function ClaimPage() {
               <p className="note">
                 Connect any Starknet wallet. If you have never used private balances before, the
                 same transaction sets you up — there is no separate step.
+              </p>
+              <p className="note">
+                The pool charges {formatAmount(POOL_FEE, 18)} STRK per transaction and requires it
+                to be funded from inside the same transaction, so your wallet needs that much STRK
+                to claim. It is the protocol&rsquo;s fee, not ours.
               </p>
               <WalletBar wallet={wallet} />
               {error && <p className="error">{error}</p>}

@@ -37,10 +37,10 @@ export async function readClaim(commitment: string): Promise<ClaimEntry | null> 
   }
   const result = await provider().callContract({
     contractAddress: ESCROW_ADDRESS,
-    entrypoint: 'claim_of',
+    entrypoint: 'get_claim',
     calldata: CallData.compile([commitment]),
   });
-  if (result.length < 5) throw new Error('Unexpected claim_of response');
+  if (result.length < 5) throw new Error('Unexpected get_claim response');
   const [token, amount, expiry, refundTo, claimed] = result;
   if (BigInt(token) === 0n) return null;
   return {

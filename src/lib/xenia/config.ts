@@ -14,6 +14,17 @@ export const MAINNET = {
 /** Deployed by Sam; filled in once the contract is on-chain. */
 export const ESCROW_ADDRESS = process.env.NEXT_PUBLIC_XENIA_ESCROW ?? '';
 
+/**
+ * What the pool charges per transaction, and the token it charges in.
+ *
+ * The fee is fronted by a relayer and reimbursed by a withdrawal out of the pool, and the pool
+ * requires every token to net zero across a transaction. So this is not just a cost — it is an
+ * inflow the transaction has to supply from somewhere. Measured on mainnet via `get_fee_amount()`;
+ * see `contracts/ONCHAIN-FINDINGS.md`.
+ */
+export const POOL_FEE_TOKEN = '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d';
+export const POOL_FEE = 6n * 10n ** 18n;
+
 /** Notes mature this many blocks after creation. A claimed note is not immediately spendable. */
 export const NOTE_MATURITY_BLOCKS = 10;
 
