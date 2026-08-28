@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { claimActions } from '@/lib/xenia/actions';
 import { formatAmount, toHex } from '@/lib/xenia/amount';
 import { ESCROW_ADDRESS, POOL_FEE, POOL_FEE_TOKEN, TOKENS } from '@/lib/xenia/config';
-import { signClaim, type LinkKey } from '@/lib/xenia/crypto';
+import { signClaim, signPublicClaim, type LinkKey } from '@/lib/xenia/crypto';
 import { readClaimFromLocation } from '@/lib/xenia/link';
-import { readClaim, statusOf, type ClaimEntry } from '@/lib/xenia/escrow';
+import { publicClaimCall, readClaim, statusOf, type ClaimEntry } from '@/lib/xenia/escrow';
 import { useWalletContext } from '@/lib/xenia/WalletContext';
 import { WalletBar } from '@/components/WalletBar';
 import { PillButton } from '@/components/site/Pill';
@@ -24,6 +24,7 @@ export default function ClaimPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [needsPublic, setNeedsPublic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
 
@@ -43,11 +44,8 @@ export default function ClaimPage() {
       // something this page can do for them: the Wallet API has no registration method, so it has
       // to happen in the wallet. Say so, rather than showing a protocol error code.
       if (/NOT_REGISTERED/i.test(raw)) {
-        setError(
-          'Your wallet has not set up private balances yet. Open it and shield any amount once — ' +
-            'in Ready that is under its privacy section — then come back to this link and claim. ' +
-            'The money stays here until you do.',
-        );
+        // Not a failure of the link. Offer the path that needs nothing of them.
+        setNeedsPublic(true);
         setBusy(false);
         return;
       }
@@ -60,6 +58,34 @@ export default function ClaimPage() {
   useEffect(() => {
     if (key) void refresh(key.commitment);
   }, [key, refresh]);
+
+  /**
+   * Paid in ordinary tokens, straight from the escrow.
+   *
+   * For a recipient who has never used private balances. The pool can only credit a note to
+   * someone with a viewing key on chain, and only they can publish one — so this path skips the
+   * pool entirely. Nothing is required of them but an address and enough gas to sign.
+   *
+   * The trade, stated on the button: this transfer is public, so their address is visible. The
+   * sender stays hidden either way.
+   */
+  async function claimPublicly() {
+    setError(null);
+    if (!wallet.account || !key) return;
+    setBusy(true);
+    try {
+      const signature = signPublicClaim(key.sk, key.commitment, wallet.account.address);
+      const { transaction_hash } = await wallet.account.execute(
+        publicClaimCall(key.pk, wallet.account.address, signature),
+      );
+      setTxHash(transaction_hash);
+      await refresh(key.commitment);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The wallet rejected the transaction.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function claim() {
     setError(null);
@@ -162,16 +188,45 @@ export default function ClaimPage() {
             <>
               <h2>Claim it</h2>
               <p className="note">
-                Connect any Starknet wallet. If you have never used private balances before, the
-                same transaction sets you up — there is no separate step.
+                Connect any Starknet wallet. If you already use private balances you will be paid
+                privately; if you have never touched them, you can still be paid — see below.
               </p>
               <WalletBar wallet={wallet} />
               {error && <p className="error">{error}</p>}
-              <div className="row" style={{ marginTop: 16 }}>
-                <PillButton disabled={!wallet.account || busy} onClick={claim}>
-                  {busy ? 'Waiting for the wallet…' : 'Claim'}
-                </PillButton>
-              </div>
+
+              {needsPublic ? (
+                <>
+                  {/*
+                    Not a failure. The pool can only credit a private note to someone who has
+                    published a viewing key, and only they can publish it — so this wallet cannot
+                    be paid privately without a one-time setup. It can be paid publicly right now.
+                  */}
+                  <p className="note" style={{ marginTop: 16 }}>
+                    This wallet has never used private balances, so it cannot receive a private
+                    payment yet. Two ways forward:
+                  </p>
+                  <div className="row" style={{ marginTop: 16 }}>
+                    <PillButton disabled={!wallet.account || busy} onClick={claimPublicly}>
+                      {busy ? 'Waiting for the wallet…' : 'Claim as ordinary tokens'}
+                    </PillButton>
+                  </div>
+                  <p className="note" style={{ marginTop: 10, opacity: 0.8 }}>
+                    Paid straight to your wallet, nothing to set up. This transfer is public, so
+                    your address will be visible receiving it — the sender stays hidden either way.
+                  </p>
+                  <p className="note" style={{ marginTop: 14, opacity: 0.8 }}>
+                    Or set up private balances once in your wallet — in Ready, shield any amount
+                    from its privacy section — then reload this page and claim privately instead.
+                    The money stays here until you decide.
+                  </p>
+                </>
+              ) : (
+                <div className="row" style={{ marginTop: 16 }}>
+                  <PillButton disabled={!wallet.account || busy} onClick={claim}>
+                    {busy ? 'Waiting for the wallet…' : 'Claim'}
+                  </PillButton>
+                </div>
+              )}
             </>
           )}
         </>

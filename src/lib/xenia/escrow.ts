@@ -7,6 +7,7 @@
 
 import { CallData, RpcProvider } from 'starknet';
 import { ESCROW_ADDRESS, CHAIN } from './config';
+import type { ClaimSignature } from './crypto';
 
 export interface ClaimEntry {
   token: string;
@@ -56,4 +57,23 @@ export function statusOf(entry: ClaimEntry | null, now = Date.now() / 1000): Cla
   if (!entry) return 'unknown';
   if (entry.claimed) return 'claimed';
   return now >= entry.expiry ? 'expired' : 'claimable';
+}
+
+/**
+ * The call that pays a claimant in ordinary tokens, outside the pool.
+ *
+ * An ordinary Starknet invoke, not a STRK20 action — which is exactly why it works for someone who
+ * has never registered. The pool is not involved, so there is no viewing key to publish and no
+ * pool fee to cover.
+ *
+ * Permissionless by design: the signature names the destination, so a third party can submit this
+ * for a recipient who has no gas without being able to redirect anything.
+ */
+export function publicClaimCall(pk: string, claimant: string, signature: ClaimSignature) {
+  const felt = (value: string) => `0x${BigInt(value).toString(16)}`;
+  return {
+    contractAddress: ESCROW_ADDRESS,
+    entrypoint: 'claim_public',
+    calldata: [felt(pk), felt(claimant), felt(signature.r), felt(signature.s)],
+  };
 }

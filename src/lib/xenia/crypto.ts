@@ -29,6 +29,12 @@ export const CLAIM_TAG = shortString.encodeShortString('XENIA_CLAIM_V1');
  * being replayed as a refund, and vice versa.
  */
 export const REFUND_TAG = shortString.encodeShortString('XENIA_REFUND_V1');
+/**
+ * Paying out publicly is a different act from crediting a private note, so it carries its own tag.
+ * Sharing one would let anyone watching the mempool replay a private claim as a public payout and
+ * expose a recipient who had chosen privacy.
+ */
+export const CLAIM_PUBLIC_TAG = shortString.encodeShortString('XENIA_CLAIM_PUBLIC_V1');
 
 export interface LinkKey {
   /** The private key. Lives in the URL fragment and nowhere else. */
@@ -85,6 +91,13 @@ export function claimMessage(commitment: string, claimant: string): string {
   return hexOf(hash.computePoseidonHashOnElements([CLAIM_TAG, hexOf(commitment), hexOf(claimant)]));
 }
 
+/** The message a claimant signs to be paid in ordinary tokens, outside the pool. */
+export function publicClaimMessage(commitment: string, claimant: string): string {
+  return hexOf(
+    hash.computePoseidonHashOnElements([CLAIM_PUBLIC_TAG, hexOf(commitment), hexOf(claimant)]),
+  );
+}
+
 export interface ClaimSignature {
   r: string;
   s: string;
@@ -113,6 +126,18 @@ export function refundMessage(commitment: string, refunder: string): string {
 /** Signs a refund for one specific address. */
 export function signRefund(sk: string, commitment: string, refunder: string): ClaimSignature {
   const signature = ec.starkCurve.sign(refundMessage(commitment, refunder), hexOf(sk));
+  return { r: hexOf(signature.r), s: hexOf(signature.s) };
+}
+
+/**
+ * Signs a public payout for one address.
+ *
+ * Needed by a recipient who has never used private balances: the pool can only credit a note to
+ * someone with a viewing key on chain, and only they can publish one. This path pays them in plain
+ * tokens instead, with nothing required of them but an address.
+ */
+export function signPublicClaim(sk: string, commitment: string, claimant: string): ClaimSignature {
+  const signature = ec.starkCurve.sign(publicClaimMessage(commitment, claimant), hexOf(sk));
   return { r: hexOf(signature.r), s: hexOf(signature.s) };
 }
 
