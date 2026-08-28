@@ -49,6 +49,14 @@ export interface RejectedWallet {
 }
 
 export interface WalletProbe {
+  /**
+   * The wallet speaks STRK20, but this account has never published a viewing key.
+   *
+   * Distinct from `supportsStrk20: false`. A wallet that cannot do STRK20 at all is a dead end;
+   * an unregistered account is one wallet action away from working, and telling someone to switch
+   * wallets when they only need to register sends them somewhere pointless.
+   */
+  needsRegistration?: boolean;
   wallet: StarknetWallet;
   name: string;
   /** The wallet answered a STRK20 read. The Wallet API route is open. */
@@ -202,12 +210,13 @@ export async function probeWallet(wallet: StarknetWallet): Promise<WalletProbe> 
     await api.request({ type: STRK20_METHODS.balances, params: { tokens: [] } });
     return { wallet, name, supportsStrk20: true };
   } catch (error) {
-    return {
-      wallet,
-      name,
-      supportsStrk20: false,
-      reason: error instanceof Error ? error.message : 'Not implemented',
-    };
+    const message = error instanceof Error ? error.message : 'Not implemented';
+    // NOT_REGISTERED is the pool answering, which means the wallet relayed the call — it speaks
+    // STRK20 fine. Only the account is missing a viewing key.
+    if (/NOT_REGISTERED/i.test(message)) {
+      return { wallet, name, supportsStrk20: true, needsRegistration: true };
+    }
+    return { wallet, name, supportsStrk20: false, reason: message };
   }
 }
 

@@ -38,6 +38,19 @@ export default function ClaimPage() {
       setEntry(await readClaim(commitment));
       setLoadError(null);
     } catch (cause) {
+      const raw = cause instanceof Error ? cause.message : String(cause);
+      // The recipient has never used private balances. Not a failure of the link, and not
+      // something this page can do for them: the Wallet API has no registration method, so it has
+      // to happen in the wallet. Say so, rather than showing a protocol error code.
+      if (/NOT_REGISTERED/i.test(raw)) {
+        setError(
+          'Your wallet has not set up private balances yet. Open it and shield any amount once — ' +
+            'in Ready that is under its privacy section — then come back to this link and claim. ' +
+            'The money stays here until you do.',
+        );
+        setBusy(false);
+        return;
+      }
       setLoadError(cause instanceof Error ? cause.message : 'Could not read the escrow');
     } finally {
       setChecked(true);
