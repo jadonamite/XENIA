@@ -26,8 +26,13 @@ const CLAIMANT: felt252 = 'CLAIMANT';
 const ATTACKER: felt252 = 'ATTACKER';
 
 const AMOUNT: u128 = 1_000_000;
-/// Fee-token balance handed to the escrow so it has something to pre-fund with.
-const ESCROW_FUNDING: u256 = 500_000;
+/// What the escrow holds before any test runs.
+///
+/// Stands in for the pool's phase-6 Withdraw. `deposit` below calls `privacy_invoke` directly, so
+/// no tokens actually move — on chain the pool would have transferred `AMOUNT` to the escrow
+/// before invoking it. Anything that really moves funds, like `claim_public`, needs that balance
+/// to exist, so it is seeded here and kept comfortably above `AMOUNT + PREFUND`.
+const ESCROW_FUNDING: u256 = 5_000_000;
 const PREFUND: u128 = 2_000;
 const START_TS: u64 = 1_000;
 const EXPIRY: u64 = 2_000;
@@ -482,10 +487,16 @@ fn a_public_claim_pays_the_claimant_directly() {
     let erc20 = IERC20Dispatcher { contract_address: token };
     let link_key = deposit(escrow, token);
     let before = erc20.balance_of(addr(CLAIMANT));
+    let escrow_before = erc20.balance_of(escrow.contract_address);
 
     claim_publicly(escrow, link_key, link_key, addr(CLAIMANT), addr(CLAIMANT));
 
-    assert!(erc20.balance_of(addr(CLAIMANT)) == before + AMOUNT.into(), "not paid");
+    assert!(erc20.balance_of(addr(CLAIMANT)) == before + AMOUNT.into(), "claimant not paid");
+    // The money has to come out of the escrow, not from nowhere.
+    assert!(
+        erc20.balance_of(escrow.contract_address) == escrow_before - AMOUNT.into(),
+        "escrow did not part with the funds",
+    );
     assert!(escrow.get_claim(compute_commitment(link_key.public_key)).claimed, "not marked");
 }
 
