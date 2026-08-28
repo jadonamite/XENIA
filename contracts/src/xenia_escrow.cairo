@@ -49,6 +49,28 @@ pub trait IXeniaEscrow<T> {
     /// The privacy pool this escrow accepts calls from.
     fn privacy_contract(self: @T) -> ContractAddress;
 
+    /// Pay a claim out as ordinary tokens, without going through the pool at all.
+    ///
+    /// The pool can only credit a private note to someone who has published a viewing key, and
+    /// only they can publish it — so a recipient who has never used the pool cannot be paid
+    /// privately, whatever the sender does. This path pays them anyway, in plain ERC-20, needing
+    /// nothing of them but an address.
+    ///
+    /// **Deliberately permissionless.** Anyone may call it, because the funds can only ever go to
+    /// the address the signature names. That lets a third party submit it for a recipient who has
+    /// no gas, without being able to redirect a single token.
+    ///
+    /// The trade is the recipient's own privacy: this transfer is public, so their address is
+    /// visible receiving from the escrow. The sender stays hidden either way — their address was
+    /// encrypted when the pool moved the funds here.
+    fn claim_public(
+        ref self: T,
+        link_pubkey: felt252,
+        claimant: ContractAddress,
+        sig_r: felt252,
+        sig_s: felt252,
+    );
+
     /// Called by the privacy pool via the `INVOKE_SELECTOR` during `InvokeExternal`.
     ///
     /// The pool deserialises calldata straight into these parameters, so the order is frozen
@@ -103,6 +125,11 @@ pub trait IXeniaEscrow<T> {
 pub const XENIA_COMMITMENT_TAG_V1: felt252 = 'XENIA_COMMITMENT_V1';
 pub const XENIA_CLAIM_TAG_V1: felt252 = 'XENIA_CLAIM_V1';
 pub const XENIA_REFUND_TAG_V1: felt252 = 'XENIA_REFUND_V1';
+/// Paying out publicly is a different act from crediting a private note, so it gets its own tag.
+/// Sharing one would let anyone who sees a private claim in the mempool replay it as a public
+/// payout and expose the recipient — the money would still reach them, but their address would be
+/// on chain against their wishes.
+pub const XENIA_CLAIM_PUBLIC_TAG_V1: felt252 = 'XENIA_CLAIM_PUBLIC_V1';
 
 pub mod errors {
     pub const ZERO_COMMITMENT: felt252 = 'ZERO_COMMITMENT';
@@ -133,6 +160,13 @@ pub fn claim_message(commitment: felt252, claimant: ContractAddress) -> felt252 
     core::poseidon::poseidon_hash_span([XENIA_CLAIM_TAG_V1, commitment, claimant.into()].span())
 }
 
+/// The message a public claimant must present a signature over.
+pub fn public_claim_message(commitment: felt252, claimant: ContractAddress) -> felt252 {
+    core::poseidon::poseidon_hash_span(
+        [XENIA_CLAIM_PUBLIC_TAG_V1, commitment, claimant.into()].span(),
+    )
+}
+
 /// The message a refunder must present a signature over. A separate tag keeps the two disjoint.
 pub fn refund_message(commitment: felt252, refunder: ContractAddress) -> felt252 {
     core::poseidon::poseidon_hash_span([XENIA_REFUND_TAG_V1, commitment, refunder.into()].span())
@@ -151,7 +185,7 @@ pub mod XeniaEscrow {
     use crate::open_note::OpenNoteDeposit;
     use super::{
         ClaimEntry, IXeniaEscrow, XeniaOperation, claim_message, compute_commitment, errors,
-        refund_message,
+        public_claim_message, refund_message,
     };
 
     #[storage]
@@ -227,6 +261,39 @@ pub mod XeniaEscrow {
 
         fn privacy_contract(self: @ContractState) -> ContractAddress {
             self.privacy_contract.read()
+        }
+
+        fn claim_public(
+            ref self: ContractState,
+            link_pubkey: felt252,
+            claimant: ContractAddress,
+            sig_r: felt252,
+            sig_s: felt252,
+        ) {
+            // No caller check, on purpose. The signature names the destination, so whoever submits
+            // this cannot send the funds anywhere else — which is what lets someone relay it for
+            // a recipient with no gas.
+            let key = compute_commitment(link_pubkey);
+            let entry = self.claims.read(key);
+            assert(entry.token.is_non_zero(), errors::COMMITMENT_NOT_FOUND);
+            assert(!entry.claimed, errors::ALREADY_CLAIMED);
+            assert(get_block_timestamp() < entry.expiry, errors::CLAIM_EXPIRED);
+
+            let message = public_claim_message(key, claimant);
+            assert(
+                check_ecdsa_signature(message, link_pubkey, sig_r, sig_s), errors::BAD_SIGNATURE,
+            );
+
+            // Same flag as the private claim and the refund, so the three remain mutually
+            // exclusive: a claim paid out here can never also be claimed privately or refunded.
+            self.claims.write(key, ClaimEntry { claimed: true, ..entry });
+
+            // Straight to the claimant. No pool, no open note, nothing required of them beyond an
+            // address — which is the entire point of this path.
+            IERC20Dispatcher { contract_address: entry.token }
+                .transfer(recipient: claimant, amount: entry.amount.into());
+
+            self.emit(ClaimRedeemed { commitment: key, claimant, amount: entry.amount });
         }
 
         fn privacy_invoke(

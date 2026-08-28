@@ -17,7 +17,7 @@ use starknet::ContractAddress;
 use xenia::xenia_escrow::XeniaEscrow::{ClaimCreated, ClaimPrefunded, ClaimRedeemed, ClaimRefunded};
 use xenia::xenia_escrow::{
     IXeniaEscrowDispatcher, IXeniaEscrowDispatcherTrait, XeniaOperation, claim_message,
-    compute_commitment, refund_message,
+    compute_commitment, public_claim_message, refund_message,
 };
 
 const POOL: felt252 = 'POOL';
@@ -456,4 +456,84 @@ fn deposit_without_prefunding_is_unchanged() {
         "escrow balance should not move",
     );
     assert!(!escrow.get_claim(compute_commitment(link_key.public_key)).claimed, "claimed");
+}
+
+// ── Public claim
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Signs a public claim for `recipient` and submits it as an arbitrary caller.
+fn claim_publicly(
+    escrow: IXeniaEscrowDispatcher,
+    link_key: snforge_std::signature::KeyPair<felt252, felt252>,
+    signer: snforge_std::signature::KeyPair<felt252, felt252>,
+    recipient: ContractAddress,
+    caller: ContractAddress,
+) {
+    let commitment = compute_commitment(link_key.public_key);
+    let (r, s) = signer.sign(public_claim_message(commitment, recipient)).unwrap();
+    start_cheat_caller_address(escrow.contract_address, caller);
+    escrow.claim_public(link_key.public_key, recipient, r, s);
+    stop_cheat_caller_address(escrow.contract_address);
+}
+
+#[test]
+fn a_public_claim_pays_the_claimant_directly() {
+    let (escrow, token) = setup();
+    let erc20 = IERC20Dispatcher { contract_address: token };
+    let link_key = deposit(escrow, token);
+    let before = erc20.balance_of(addr(CLAIMANT));
+
+    claim_publicly(escrow, link_key, link_key, addr(CLAIMANT), addr(CLAIMANT));
+
+    assert!(erc20.balance_of(addr(CLAIMANT)) == before + AMOUNT.into(), "not paid");
+    assert!(escrow.get_claim(compute_commitment(link_key.public_key)).claimed, "not marked");
+}
+
+/// The point of leaving it permissionless: someone else can submit it for a claimant with no gas,
+/// and still cannot redirect a token.
+#[test]
+fn anyone_may_submit_a_public_claim_on_the_claimants_behalf() {
+    let (escrow, token) = setup();
+    let erc20 = IERC20Dispatcher { contract_address: token };
+    let link_key = deposit(escrow, token);
+
+    claim_publicly(escrow, link_key, link_key, addr(CLAIMANT), addr(ATTACKER));
+
+    assert!(erc20.balance_of(addr(CLAIMANT)) == AMOUNT.into(), "claimant not paid");
+    assert!(erc20.balance_of(addr(ATTACKER)) == 0, "submitter took funds");
+}
+
+/// A private-claim signature must not work here, or anyone watching the mempool could force a
+/// public payout and expose a recipient who chose privacy.
+#[test]
+#[should_panic(expected: 'BAD_SIGNATURE')]
+fn a_private_claim_signature_cannot_force_a_public_payout() {
+    let (escrow, token) = setup();
+    let link_key = deposit(escrow, token);
+    let commitment = compute_commitment(link_key.public_key);
+    let (r, s) = link_key.sign(claim_message(commitment, addr(CLAIMANT))).unwrap();
+
+    start_cheat_caller_address(escrow.contract_address, addr(CLAIMANT));
+    escrow.claim_public(link_key.public_key, addr(CLAIMANT), r, s);
+}
+
+#[test]
+#[should_panic(expected: 'ALREADY_CLAIMED')]
+fn a_public_claim_cannot_follow_a_private_one() {
+    let (escrow, token) = setup();
+    let link_key = deposit(escrow, token);
+    settle(escrow, link_key, link_key, addr(CLAIMANT), false);
+    claim_publicly(escrow, link_key, link_key, addr(CLAIMANT), addr(CLAIMANT));
+}
+
+#[test]
+#[should_panic(expected: 'BAD_SIGNATURE')]
+fn a_public_claim_cannot_be_redirected() {
+    let (escrow, token) = setup();
+    let link_key = deposit(escrow, token);
+    let commitment = compute_commitment(link_key.public_key);
+    let (r, s) = link_key.sign(public_claim_message(commitment, addr(CLAIMANT))).unwrap();
+
+    start_cheat_caller_address(escrow.contract_address, addr(ATTACKER));
+    escrow.claim_public(link_key.public_key, addr(ATTACKER), r, s);
 }
