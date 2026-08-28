@@ -77,3 +77,30 @@ export function publicClaimCall(pk: string, claimant: string, signature: ClaimSi
     calldata: [felt(pk), felt(claimant), felt(signature.r), felt(signature.s)],
   };
 }
+
+/**
+ * Asks the relayer to submit a public claim, so the recipient needs no gas.
+ *
+ * Safe to hand to a stranger's server: the signature names the destination, so the relayer can
+ * only pay the address it was given, and the contract enforces that. The worst a hostile relayer
+ * could do is refuse.
+ *
+ * Returns null when relaying is unavailable, so the caller can fall back to the recipient
+ * submitting it from their own wallet.
+ */
+export async function relayPublicClaim(
+  pk: string,
+  claimant: string,
+  signature: ClaimSignature,
+): Promise<{ transaction_hash: string } | null> {
+  const response = await fetch('/api/relay', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pk, claimant, r: signature.r, s: signature.s }),
+  });
+
+  if (response.status === 503) return null; // not configured — caller falls back
+  const body = await response.json();
+  if (!response.ok) throw new Error(body?.error ?? 'The relayer refused the claim.');
+  return body;
+}

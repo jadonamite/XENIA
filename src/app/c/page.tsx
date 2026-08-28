@@ -6,7 +6,13 @@ import { formatAmount, toHex } from '@/lib/xenia/amount';
 import { ESCROW_ADDRESS, POOL_FEE, POOL_FEE_TOKEN, TOKENS } from '@/lib/xenia/config';
 import { signClaim, signPublicClaim, type LinkKey } from '@/lib/xenia/crypto';
 import { readClaimFromLocation } from '@/lib/xenia/link';
-import { publicClaimCall, readClaim, statusOf, type ClaimEntry } from '@/lib/xenia/escrow';
+import {
+  publicClaimCall,
+  readClaim,
+  relayPublicClaim,
+  statusOf,
+  type ClaimEntry,
+} from '@/lib/xenia/escrow';
 import { useWalletContext } from '@/lib/xenia/WalletContext';
 import { WalletBar } from '@/components/WalletBar';
 import { PillButton } from '@/components/site/Pill';
@@ -75,9 +81,13 @@ export default function ClaimPage() {
     setBusy(true);
     try {
       const signature = signPublicClaim(key.sk, key.commitment, wallet.account.address);
-      const { transaction_hash } = await wallet.account.execute(
-        publicClaimCall(key.pk, wallet.account.address, signature),
-      );
+
+      // Try the relayer first: the link key already authorised this, and the signature names the
+      // destination, so submitting it costs the recipient nothing and risks nothing. Only if
+      // relaying is unavailable do we ask them to pay their own gas.
+      const relayed = await relayPublicClaim(key.pk, wallet.account.address, signature);
+      const { transaction_hash } =
+        relayed ?? (await wallet.account.execute(publicClaimCall(key.pk, wallet.account.address, signature)));
       setTxHash(transaction_hash);
       await refresh(key.commitment);
     } catch (cause) {

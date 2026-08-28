@@ -1,5 +1,29 @@
 # Deployments
 
+## Mainnet — 2026-08-28 (current)
+
+| | |
+|---|---|
+| `XeniaEscrow` | `0x2d329a8c65adccb51b17ef5274e7234c998dc29c02dc2c7a3c6d064af341cbe` |
+| Class hash | `0x1ceae9e9727babbc5def20c2f7a49294d264337eb0c3d8825f71e657f46c5a3` |
+| Deploy tx | `0x33fa42fd39d3d085a21e1d23509c79ab98b8bdaf619831347f1ec92fa59899d` |
+| Cost | 13.7 STRK (estimate said 27; the ceiling is not the charge) |
+
+Adds `claim_public`, which pays a recipient in ordinary tokens without the pool. Verified live:
+the pool address is right and `claim_public` is in the deployed ABI.
+
+**Supersedes the 26 August deployment**, which has no `claim_public`. The 3.5 STRK claim created
+and redeemed there is unreachable from this contract; both of those transactions succeeded and
+remain valid history.
+
+### A trap worth recording
+
+`rpc.starknet.lava.build` upgraded to RPC spec **0.10.2**, and starknet.js 10.7.1 targets **0.9.0**.
+Against it, `estimateDeclareFee` fails inside `getStarknetVersion` with a stack trace that looks
+like a flaky endpoint rather than a version mismatch. `api.zan.top/public/starknet-mainnet` serves
+0.9.0 and works. Check `starknet_specVersion` before blaming the network.
+
+
 ## Mainnet — 2026-08-26
 
 | | |

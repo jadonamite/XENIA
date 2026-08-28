@@ -15,7 +15,7 @@ export type NetworkName = 'mainnet' | 'sepolia';
 const NETWORKS = {
   mainnet: {
     chainId: 'SN_MAIN',
-    rpcUrl: 'https://rpc.starknet.lava.build',
+    rpcUrl: 'https://api.zan.top/public/starknet-mainnet',
     poolAddress: '0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a',
     /**
      * What the pool charges per transaction. Measured live with `get_fee_amount()`, not assumed —
