@@ -140,6 +140,50 @@ invariant actually enforces — are in
 [`contracts/ONCHAIN-FINDINGS.md`](contracts/ONCHAIN-FINDINGS.md), taken from the pool's source and
 its mainnet transaction history rather than from documentation.
 
+## Roadmap — private receipt without setup
+
+Today a recipient who has never used the pool is paid in **ordinary tokens**. They receive
+instantly with nothing to set up, but that transfer is public: their address is visible receiving
+from the escrow. The sender stays hidden either way.
+
+Paying them **privately** would need them registered, and that is where it stops — but not for the
+reason it first appears.
+
+**It is not that only they can register.** The pool binds nothing to the caller:
+`get_caller_address()` appears once in the whole contract, to charge the fee.
+`compile_actions` takes the user's address and viewing key as *parameters*, and `apply_actions`
+takes neither. A third party can register someone, which is exactly how relayers submit private
+transactions at all.
+
+**It is that every pool transaction needs a proof.** `apply_actions` calls `validate_proof`
+unconditionally, which asserts the transaction carries proof facts from a virtual Starknet OS
+execution:
+
+```cairo
+assert(!proof_facts_span.is_empty(), errors::EMPTY_PROOF_FACTS);
+assert(program_variant == VIRTUAL_SNOS, errors::INVALID_PROGRAM_VARIANT);
+```
+
+Those facts come from a proving service. Wallets reach one; the Wallet API exposes no `register`
+action, so a dapp cannot ask a wallet to register on a recipient's behalf, and cannot produce the
+proof itself without a prover.
+
+**The prover is self-hostable**, which makes this a roadmap item rather than a dead end:
+
+```bash
+docker run -p 3000:3000 \n  -e RPC_URL=<v0.10 node> \n  -e CHAIN_ID=SN_MAIN \n  ghcr.io/starkware-libs/starknet-privacy/transaction-prover:PRIVACY-0.14.3-RC.2
+```
+
+It takes an Invoke V3 transaction and returns `{ proof, proof_facts }`. With one running, Xenia
+could register a recipient itself — they sign one standard message, which any Starknet wallet can
+do — and pay them privately with no setup at all.
+
+What that costs, stated plainly: a host with real CPU and memory for STARK proving, an RPC node on
+the v0.10 API, a move from the Wallet API to the SDK route, and a discovery indexer, since
+`ContractDiscoveryProvider` is not exported in `0.14.3-rc.5`. Also care with the viewing key —
+it is derived in the recipient's browser, and calling `compile_actions` over a public RPC would
+hand it to that node.
+
 ## Credit
 
 The escrow pattern starts from the [reference escrow helper](https://strk20-by-example.org/helpers/escrow)

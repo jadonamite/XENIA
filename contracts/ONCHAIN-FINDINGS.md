@@ -212,9 +212,20 @@ register before shielding.
 actually reached the pool's check — but reaching it would only have produced a reverted transaction
 and a wasted fee.
 
-**Consequence for Xenia.** No amount of client work makes private receipt reachable for a
-first-time recipient, because only they can publish their own viewing key and only the pool can
-accept it. `claim_public` exists because of this: it pays them in plain ERC-20, outside the pool,
+**Correction, 29 Aug.** The reason given here first — "only they can publish their own viewing key"
+— is wrong. The pool binds nothing to the caller: `get_caller_address()` appears once in the
+contract, to charge the fee. `compile_actions` takes the user's address and viewing key as
+parameters and `apply_actions` takes neither, so a third party *can* register someone. That is how
+relayers submit private transactions at all.
+
+The real blocker is that `apply_actions` calls `validate_proof` unconditionally, which asserts the
+transaction carries proof facts from a virtual Starknet OS execution. Those come from a proving
+service, there is no public one on mainnet, and the Wallet API has no `register` action to delegate
+it to a wallet. The prover is self-hostable — see the roadmap in the README — which makes this a
+missing piece of infrastructure rather than a property of the protocol.
+
+**Consequence for Xenia.** Without a prover, private receipt is unreachable for a first-time
+recipient. `claim_public` exists because of this: it pays them in plain ERC-20, outside the pool,
 which is the one thing that needs nothing of them. Proven on mainnet in
 `0x2b7877d75e7a52317cdfa793d696d4d2f84c466fbaee3d8ca138ae5252dcf64`, submitted by our relayer, with
 the recipient signing nothing and holding nothing.
