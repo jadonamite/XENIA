@@ -22,12 +22,12 @@ export function WalletBar({ wallet }: { wallet: WalletState }) {
             Disconnect
           </PillButton>
         </div>
+        {/*
+          Neutral on purpose. On the claim page a public payout is offered right below this, so
+          telling someone their only option is to go and set something up would be wrong there.
+          The page that needs the instruction gives it.
+        */}
         {wallet.probe?.needsRegistration && (
-          {/*
-            Neutral on purpose. On the claim page a public payout is offered right below this, so
-            telling someone their only option is to go and set something up would be wrong there.
-            The page that needs the instruction gives it.
-          */}
           <p className="note" style={{ marginBottom: 0 }}>
             This account has not set up private balances. The wallet itself is fine.
           </p>
