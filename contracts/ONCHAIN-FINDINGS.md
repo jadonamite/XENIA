@@ -218,3 +218,25 @@ accept it. `claim_public` exists because of this: it pays them in plain ERC-20, 
 which is the one thing that needs nothing of them. Proven on mainnet in
 `0x2b7877d75e7a52317cdfa793d696d4d2f84c466fbaee3d8ca138ae5252dcf64`, submitted by our relayer, with
 the recipient signing nothing and holding nothing.
+
+## Confirmed against the live contract, for free
+
+`compile_actions` is a view function, so the assert can be triggered with `starknet_call` — no
+transaction, no fee. Against the mainnet pool:
+
+```
+unregistered sender         → SENDER_NOT_REGISTERED
+registered sender, bad key  → SENDER_NOT_AUTHENTICATED
+```
+
+The deployed contract refuses, and refuses a guessed key too. This is the pool's own code executing,
+not a wallet declining and not a line read from a repository.
+
+**Scope, stated precisely.** This reaches the *sender* assert. `RECIPIENT_NOT_REGISTERED` sits eight
+lines below it on the same code path, and reaching it needs a registered address together with its
+correct viewing private key — the second result above shows the pool will not accept a guess, and
+obtaining the real one means handling a user's secret. So the mechanism is empirically confirmed
+live; that particular line is read from source.
+
+Worth knowing the technique: **an assert in a view function can be tested for nothing.** It answered
+in seconds what would otherwise have cost 6 STRK and a reverted transaction.
