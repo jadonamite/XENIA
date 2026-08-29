@@ -70,9 +70,14 @@ export default function CreatePage() {
     // refusing it outright blocks the case where the sender's own balance cannot stretch further.
     // The pool charges its fee on this transaction too, so a sender holding 10 STRK can create a
     // claim of at most 4. Warn, and let them decide.
+    //
+    // Say which claim this is about. The fee falls on a *private* redemption, where the recipient
+    // pays the pool themselves. The public route costs them nothing at all — we relay it and cover
+    // the gas — so a flat "this costs 6 STRK to redeem" is wrong for exactly the recipient who
+    // most needs a small claim to be worth taking: the one arriving with an empty wallet.
     setWarning(
       token.symbol === 'STRK' && units < POOL_FEE
-        ? `The pool charges ${formatAmount(POOL_FEE, 18)} STRK to redeem a claim, which is more than this claim is worth.`
+        ? `Redeeming this privately costs the recipient a ${formatAmount(POOL_FEE, 18)} STRK pool fee, which is more than the claim is worth. Claiming it publicly costs them nothing — Xenia pays the gas — so a first-time recipient is unaffected.`
         : null,
     );
 
