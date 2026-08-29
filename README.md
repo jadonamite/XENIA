@@ -171,7 +171,10 @@ proof itself without a prover.
 **The prover is self-hostable**, which makes this a roadmap item rather than a dead end:
 
 ```bash
-docker run -p 3000:3000 \n  -e RPC_URL=<v0.10 node> \n  -e CHAIN_ID=SN_MAIN \n  ghcr.io/starkware-libs/starknet-privacy/transaction-prover:PRIVACY-0.14.3-RC.2
+docker run -p 3000:3000 \
+  -e RPC_URL=<v0.10 node> \
+  -e CHAIN_ID=SN_MAIN \
+  ghcr.io/starkware-libs/starknet-privacy/transaction-prover:PRIVACY-0.14.3-RC.2
 ```
 
 It takes an Invoke V3 transaction and returns `{ proof, proof_facts }`. With one running, Xenia
