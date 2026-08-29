@@ -33,6 +33,14 @@ export default function ClaimPage() {
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [needsPublic, setNeedsPublic] = useState(false);
+
+  /**
+   * The connect probe already knows whether this account can be paid privately, so offer the
+   * public path immediately rather than making someone submit a transaction that cannot succeed
+   * in order to find out.
+   */
+  const unregistered = wallet.probe?.needsRegistration === true;
+  const offerPublic = needsPublic || unregistered;
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
 
@@ -230,7 +238,7 @@ export default function ClaimPage() {
               <WalletBar wallet={wallet} />
               {error && <p className="error">{error}</p>}
 
-              {needsPublic ? (
+              {offerPublic ? (
                 <>
                   {/*
                     Not a failure. The pool can only credit a private note to someone who has
@@ -238,8 +246,7 @@ export default function ClaimPage() {
                     be paid privately without a one-time setup. It can be paid publicly right now.
                   */}
                   <p className="note" style={{ marginTop: 16 }}>
-                    This wallet has never used private balances, so it cannot receive a private
-                    payment yet. Two ways forward:
+                    This wallet has never used private balances. You can still be paid right now:
                   </p>
                   <div className="row" style={{ marginTop: 16 }}>
                     <PillButton disabled={!wallet.account || busy} onClick={claimPublicly}>

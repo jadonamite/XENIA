@@ -23,9 +23,13 @@ export function WalletBar({ wallet }: { wallet: WalletState }) {
           </PillButton>
         </div>
         {wallet.probe?.needsRegistration && (
+          {/*
+            Neutral on purpose. On the claim page a public payout is offered right below this, so
+            telling someone their only option is to go and set something up would be wrong there.
+            The page that needs the instruction gives it.
+          */}
           <p className="note" style={{ marginBottom: 0 }}>
-            This account has not set up private balances yet. Do it once in your wallet — in Ready,
-            shield any amount from its privacy section — then come back. The wallet itself is fine.
+            This account has not set up private balances. The wallet itself is fine.
           </p>
         )}
         {wallet.probe && !wallet.probe.supportsStrk20 && (
