@@ -14,6 +14,7 @@ import {
 import { generateLinkKey } from '@/lib/xenia/crypto';
 import { buildClaimLink } from '@/lib/xenia/link';
 import { saveClaim } from '@/lib/xenia/store';
+import { isInconclusive, waitForClaim } from '@/lib/xenia/escrow';
 import { useWalletContext } from '@/lib/xenia/WalletContext';
 import { ClaimLinkCard } from '@/components/ClaimLinkCard';
 import { SlideToPay } from '@/components/app/SlideToPay';
@@ -36,6 +37,7 @@ export default function CreatePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState(false);
   const [link, setLink] = useState<string | null>(null);
 
   const token = tokenBySymbol(symbol) ?? TOKENS[0];
@@ -102,6 +104,37 @@ export default function CreatePage() {
       });
       setLink(buildClaimLink(window.location.origin, key.sk));
     } catch (cause) {
+      // A timeout is not a failure. The transaction is proved and relayed before it lands, so the
+      // wallet can stop waiting while it goes on to succeed — and losing the link here would
+      // strand real money that is sitting in the escrow.
+      if (isInconclusive(cause)) {
+        setError(null);
+        setWaiting(true);
+        const landed = await waitForClaim(key.commitment, (entry) => entry !== null);
+        setWaiting(false);
+        if (landed) {
+          saveClaim({
+            commitment: key.commitment,
+            pk: key.pk,
+            sk: key.sk,
+            tokenSymbol: token.symbol,
+            tokenAddress: token.address,
+            amount: units.toString(),
+            expiry,
+            createdAt: Math.floor(Date.now() / 1000),
+            txHash: '',
+          });
+          setLink(buildClaimLink(window.location.origin, key.sk));
+          setBusy(false);
+          return;
+        }
+        setError(
+          'The wallet stopped waiting and the claim has not appeared on chain yet. It may still ' +
+            'land — check My Links in a minute before trying again, so you do not pay twice.',
+        );
+        setBusy(false);
+        return;
+      }
       setError(cause instanceof Error ? cause.message : 'The wallet rejected the transaction.');
     } finally {
       setBusy(false);

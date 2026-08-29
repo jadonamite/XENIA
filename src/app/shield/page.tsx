@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { shieldActions } from '@/lib/xenia/actions';
+import { isInconclusive } from '@/lib/xenia/escrow';
 import { parseAmount, toHex } from '@/lib/xenia/amount';
 import { NETWORK, POOL_FEE, TOKENS, tokenBySymbol } from '@/lib/xenia/config';
 import { useWalletContext } from '@/lib/xenia/WalletContext';
@@ -64,6 +65,16 @@ export default function ShieldPage() {
       setAmount('');
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
+      // Unlike a claim, there is nothing public to check afterwards — a shielded balance is
+      // readable only by its owner. So say what is actually known instead of calling it a failure.
+      if (isInconclusive(cause)) {
+        setError(
+          'The wallet stopped waiting. The transaction may still have gone through — check your ' +
+            'shielded balance in your wallet before shielding again, so you do not pay the fee twice.',
+        );
+        setBusy(false);
+        return;
+      }
       // The pool refuses to hold funds for an account with no viewing key on chain. Nothing the
       // app can do about it: the Wallet API exposes no way to register, so the wallet has to.
       if (/NOT_REGISTERED/i.test(message)) setNeedsRegistration(true);

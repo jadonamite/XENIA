@@ -104,3 +104,42 @@ export async function relayPublicClaim(
   if (!response.ok) throw new Error(body?.error ?? 'The relayer refused the claim.');
   return body;
 }
+
+/**
+ * Whether a submission error means "it failed" or only "we stopped waiting".
+ *
+ * A STRK20 transaction is proved and relayed before it lands, which takes long enough that the
+ * wallet request can time out while the transaction goes on to succeed. Reporting that as a
+ * failure is worse than reporting nothing: the money moved and the screen said it did not.
+ *
+ * A rejection names a reason — the user declined, the pool refused, a balance was short. A timeout
+ * names nothing, and the chain is the only thing that knows.
+ */
+export function isInconclusive(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /timeout|timed out|took too long|no response|deadline|aborted/i.test(message);
+}
+
+/**
+ * Polls the escrow until `predicate` holds, or gives up.
+ *
+ * Used after an inconclusive submission to ask the contract what actually happened, rather than
+ * guessing from the error. The contract's state is the truth; the wallet's answer is only a report
+ * about it.
+ */
+export async function waitForClaim(
+  commitment: string,
+  predicate: (entry: ClaimEntry | null) => boolean,
+  { attempts = 20, intervalMs = 3000 }: { attempts?: number; intervalMs?: number } = {},
+): Promise<ClaimEntry | null | undefined> {
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      const entry = await readClaim(commitment);
+      if (predicate(entry)) return entry;
+    } catch {
+      // A read failing is not an answer either — keep waiting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return undefined; // still unknown
+}

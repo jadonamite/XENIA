@@ -7,10 +7,12 @@ import { ESCROW_ADDRESS, POOL_FEE, POOL_FEE_TOKEN, TOKENS } from '@/lib/xenia/co
 import { signClaim, signPublicClaim, type LinkKey } from '@/lib/xenia/crypto';
 import { readClaimFromLocation } from '@/lib/xenia/link';
 import {
+  isInconclusive,
   publicClaimCall,
   readClaim,
   relayPublicClaim,
   statusOf,
+  waitForClaim,
   type ClaimEntry,
 } from '@/lib/xenia/escrow';
 import { useWalletContext } from '@/lib/xenia/WalletContext';
@@ -55,6 +57,7 @@ export default function ClaimPage() {
         setBusy(false);
         return;
       }
+      if (await settledDespite(cause)) return;
       setLoadError(cause instanceof Error ? cause.message : 'Could not read the escrow');
     } finally {
       setChecked(true);
@@ -91,10 +94,33 @@ export default function ClaimPage() {
       setTxHash(transaction_hash);
       await refresh(key.commitment);
     } catch (cause) {
+      if (await settledDespite(cause)) return;
       setError(cause instanceof Error ? cause.message : 'The wallet rejected the transaction.');
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * A timeout is not a failure — the transaction may have landed while the wallet stopped waiting.
+   * The contract knows; ask it rather than guessing from the error.
+   *
+   * Returns true when the claim did in fact settle, so the caller can stop treating it as a
+   * problem.
+   */
+  async function settledDespite(cause: unknown): Promise<boolean> {
+    if (!key || !isInconclusive(cause)) return false;
+    setError(null);
+    const settled = await waitForClaim(key.commitment, (entry) => entry?.claimed === true);
+    if (settled) {
+      await refresh(key.commitment);
+      return true;
+    }
+    setError(
+      'The wallet stopped waiting and the claim has not settled on chain yet. It may still land — ' +
+        'reload in a minute before trying again, so you do not pay twice.',
+    );
+    return true;
   }
 
   async function claim() {
