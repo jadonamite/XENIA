@@ -143,3 +143,23 @@ export async function waitForClaim(
   }
   return undefined; // still unknown
 }
+
+/**
+ * Whether an account can receive privately, read straight from the pool.
+ *
+ * The wallet knows this too, but asking it costs a consent prompt — `wallet_strk20Balances` makes
+ * Ready ask to share shielded assets — which is why the connect probe cannot run on a silent
+ * session restore. The consequence was that reloading the claim page lost the answer and hid the
+ * public payout until the visitor disconnected and reconnected.
+ *
+ * The pool stores every registered account's viewing key publicly, so this is an ordinary read:
+ * no wallet, no prompt, no permission, and authoritative. A zero key means never registered.
+ */
+export async function isRegistered(address: string): Promise<boolean> {
+  const result = await provider().callContract({
+    contractAddress: CHAIN.poolAddress,
+    entrypoint: 'get_public_key',
+    calldata: CallData.compile([address]),
+  });
+  return BigInt(result[0] ?? '0x0') !== 0n;
+}

@@ -8,6 +8,7 @@ import { signClaim, signPublicClaim, type LinkKey } from '@/lib/xenia/crypto';
 import { readClaimFromLocation } from '@/lib/xenia/link';
 import {
   isInconclusive,
+  isRegistered,
   publicClaimCall,
   readClaim,
   relayPublicClaim,
@@ -35,11 +36,36 @@ export default function ClaimPage() {
   const [needsPublic, setNeedsPublic] = useState(false);
 
   /**
-   * The connect probe already knows whether this account can be paid privately, so offer the
-   * public path immediately rather than making someone submit a transaction that cannot succeed
-   * in order to find out.
+   * Whether this account can be paid privately, read from the pool rather than from the wallet.
+   *
+   * The connect probe answers this too, but it cannot run on a silent session restore — asking the
+   * wallet costs a consent prompt, and firing that on page load is what made the extension pop up
+   * on every visit. So reloading used to lose the answer and hide the public payout until the
+   * visitor disconnected and reconnected.
+   *
+   * Reading the pool needs no wallet and no permission, so it survives a reload.
    */
-  const unregistered = wallet.probe?.needsRegistration === true;
+  const [unregistered, setUnregistered] = useState(false);
+  useEffect(() => {
+    const address = wallet.account?.address;
+    if (!address) {
+      setUnregistered(false);
+      return;
+    }
+    let current = true;
+    isRegistered(address)
+      .then((registered) => {
+        if (current) setUnregistered(!registered);
+      })
+      .catch(() => {
+        // If the pool cannot be read, fall back to the probe rather than guessing.
+        if (current) setUnregistered(wallet.probe?.needsRegistration === true);
+      });
+    return () => {
+      current = false;
+    };
+  }, [wallet.account?.address, wallet.probe]);
+
   const offerPublic = needsPublic || unregistered;
   const [error, setError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
