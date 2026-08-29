@@ -182,3 +182,39 @@ A third path exists but does not generalise: paying the fee publicly from the us
 as the standalone registrations do. It requires a standing STRK allowance to the pool and, more
 importantly, was never observed on a note-bearing transaction — plausibly because those go through
 the proving and relayer infrastructure. Worth one probe, but not worth designing around.
+
+---
+
+# 6. Private receipt requires registration — enforced by the pool, not the wallet
+
+The wallet's `NOT_REGISTERED` left an obvious question: is that Ready declining, or the protocol? A
+wallet's refusal might be routed around; the chain's cannot. It is the chain's.
+
+`privacy.cairo`, in `open_channel`:
+
+```cairo
+// Assert sender is registered with the given private key.
+let sender_public_key = self.public_key.read(sender_addr);
+assert(sender_public_key.is_non_zero(), errors::SENDER_NOT_REGISTERED);
+...
+// Assert recipient is registered.
+let recipient_public_key = self.public_key.read(recipient_addr);
+assert(recipient_public_key.is_non_zero(), errors::RECIPIENT_NOT_REGISTERED);
+```
+
+A private note travels over a channel, and a channel cannot be opened to an address with no viewing
+key published. The assert is unconditional, in the contract deployed on mainnet, and there is no
+alternative entry point that skips it. Both ends are covered, which is also why a sender must
+register before shielding.
+
+**Note the wallet stopped us first.** The pool's errors are `SENDER_NOT_REGISTERED` and
+`RECIPIENT_NOT_REGISTERED`; what Ready showed was a plain `NOT_REGISTERED` of its own. So we never
+actually reached the pool's check — but reaching it would only have produced a reverted transaction
+and a wasted fee.
+
+**Consequence for Xenia.** No amount of client work makes private receipt reachable for a
+first-time recipient, because only they can publish their own viewing key and only the pool can
+accept it. `claim_public` exists because of this: it pays them in plain ERC-20, outside the pool,
+which is the one thing that needs nothing of them. Proven on mainnet in
+`0x2b7877d75e7a52317cdfa793d696d4d2f84c466fbaee3d8ca138ae5252dcf64`, submitted by our relayer, with
+the recipient signing nothing and holding nothing.
