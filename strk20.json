@@ -1,7 +1,10 @@
 {
-  "transactions": [],
+  "transactions": [
+    "0x2523227b4448d6b30b4ac72a092388530be627a1d497f329f36f896565c4924",
+    "0x2b7877d75e7a52317cdfa793d696d4d2f84c466fbaee3d8ca138ae5252dcf64"
+  ],
   "contracts": [
-    "0x257082062a074eb79575b859c9b3aadd40a986501223928121b5a1f56627095"
+    "0x2d329a8c65adccb51b17ef5274e7234c998dc29c02dc2c7a3c6d064af341cbe"
   ],
   "demo_video": "",
   "demo_url": "https://usexenia.vercel.app"
