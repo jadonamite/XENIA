@@ -14,7 +14,7 @@ import {
 import { generateLinkKey } from '@/lib/xenia/crypto';
 import { buildClaimLink } from '@/lib/xenia/link';
 import { saveClaim } from '@/lib/xenia/store';
-import { isInconclusive, waitForClaim } from '@/lib/xenia/escrow';
+import { isInconclusive, STALE_PROMPT, waitForClaim } from '@/lib/xenia/escrow';
 import { useWalletContext } from '@/lib/xenia/WalletContext';
 import { ClaimLinkCard } from '@/components/ClaimLinkCard';
 import { SlideToPay } from '@/components/app/SlideToPay';
@@ -77,6 +77,7 @@ export default function CreatePage() {
     );
 
     const expiry = Math.floor(Date.now() / 1000) + expiryWindow;
+
     const key = generateLinkKey();
 
     setBusy(true);
@@ -125,6 +126,7 @@ export default function CreatePage() {
             txHash: '',
           });
           setLink(buildClaimLink(window.location.origin, key.sk));
+          setWarning(STALE_PROMPT);
           setBusy(false);
           return;
         }

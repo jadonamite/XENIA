@@ -70,7 +70,9 @@ export default function ShieldPage() {
       if (isInconclusive(cause)) {
         setError(
           'The wallet stopped waiting. The transaction may still have gone through — check your ' +
-            'shielded balance in your wallet before shielding again, so you do not pay the fee twice.',
+            'shielded balance in your wallet before shielding again, so you do not pay the fee ' +
+            'twice. If the wallet is still asking you to approve it, dismiss that prompt rather ' +
+            'than accepting it again.',
         );
         setBusy(false);
         return;

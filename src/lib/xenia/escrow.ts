@@ -115,6 +115,22 @@ export async function relayPublicClaim(
  * A rejection names a reason — the user declined, the pool refused, a balance was short. A timeout
  * names nothing, and the chain is the only thing that knows.
  */
+/**
+ * What to tell someone whose transaction we recovered from an inconclusive submission.
+ *
+ * Ready gives up on its own request while the transaction goes on to be proved, relayed and
+ * mined — that is what `isInconclusive` is for. But the extension also leaves its approval dialog
+ * open, so the sender is shown a finished, successful action by us and a live "accept or decline"
+ * by the wallet at the same moment, and the safe-looking button is the wrong one.
+ *
+ * Approving it again submits the whole thing a second time, at a second 6 STRK pool fee. We cannot
+ * close another extension's window, so the least we can do is say which way is safe.
+ */
+export const STALE_PROMPT =
+  'Your wallet may still be showing an approval prompt for this transaction. It has already gone ' +
+  'through - dismiss or decline that prompt. Approving it a second time would send the ' +
+  'transaction again and pay the pool fee twice.';
+
 export function isInconclusive(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /timeout|timed out|took too long|no response|deadline|aborted/i.test(message);

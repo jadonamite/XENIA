@@ -10,7 +10,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RpcProvider, WalletAccountV6 } from 'starknet';
 import { CHAIN } from './config';
-import { onWalletsChanged, probeWallet, type StarknetWallet, type WalletProbe } from './wallet';
+import {
+  onWalletsChanged,
+  probeWalletWithin,
+  type StarknetWallet,
+  type WalletProbe,
+} from './wallet';
 
 export interface WalletState {
   available: StarknetWallet[];
@@ -42,10 +47,12 @@ export function useWallet(): WalletState {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const connected = await WalletAccountV6.connect(provider, wallet as any);
         setAccount(connected);
-        setProbe(await probeWallet(wallet));
+        // See `WalletContext`: the probe is a second wallet request that may never be answered,
+        // and the button must not wait for it.
+        setConnecting(false);
+        setProbe(await probeWalletWithin(wallet));
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Could not connect');
-      } finally {
         setConnecting(false);
       }
     },

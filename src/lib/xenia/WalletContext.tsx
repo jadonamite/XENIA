@@ -15,7 +15,7 @@ import { CHAIN } from './config';
 import {
   isAlreadyPermitted,
   onWalletsChanged,
-  probeWallet,
+  probeWalletWithin,
   type StarknetWallet,
   type WalletProbe,
 } from './wallet';
@@ -72,10 +72,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         const connected = await WalletAccountV6.connect(provider, wallet as any);
         setAccount(connected);
         remember(wallet.name);
-        setProbe(await probeWallet(wallet));
+        // Release the button here, not in `finally`. The account is in hand; the probe below is a
+        // *second* wallet request, and Ready answers it with its own consent modal for sharing
+        // shielded assets. Waiting for that before clearing `connecting` is what left Connect
+        // spinning on a session that was already live — until a reload revealed it.
+        setConnecting(false);
+        setProbe(await probeWalletWithin(wallet));
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Could not connect');
-      } finally {
         setConnecting(false);
       }
     },

@@ -220,6 +220,37 @@ export async function probeWallet(wallet: StarknetWallet): Promise<WalletProbe> 
   }
 }
 
+/**
+ * `probeWallet`, but it always answers.
+ *
+ * The probe is itself a wallet request, and a wallet request can simply never settle. Ready raises
+ * its own consent modal for `wallet_strk20Balances` — it is being asked to share shielded assets —
+ * and a visitor who never answers that modal leaves the promise pending forever.
+ *
+ * That matters because the caller is the Connect button. Awaiting the probe before releasing it is
+ * what left the button spinning on a wallet that had already handed over the account.
+ *
+ * A wallet that misses the deadline is reported as `null` — unknown — rather than unsupported.
+ * "We did not hear back" and "it cannot do this" are different facts, and only the second should
+ * close a door in the UI.
+ */
+export async function probeWalletWithin(
+  wallet: StarknetWallet,
+  ms = 8000,
+): Promise<WalletProbe | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      probeWallet(wallet),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /** Probes everything the page can see, in parallel. */
 export function probeWallets(): Promise<WalletProbe[]> {
   return Promise.all(discoverWallets().map(probeWallet));
