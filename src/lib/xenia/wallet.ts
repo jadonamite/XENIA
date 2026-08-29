@@ -224,3 +224,26 @@ export async function probeWallet(wallet: StarknetWallet): Promise<WalletProbe> 
 export function probeWallets(): Promise<WalletProbe[]> {
   return Promise.all(discoverWallets().map(probeWallet));
 }
+
+/**
+ * Whether this site is already authorised by the wallet, without asking it for anything.
+ *
+ * `wallet_getPermissions` is the one call that never prompts: it reports what the user has already
+ * granted. Connecting does prompt — it asks the extension to unlock and to approve the site — which
+ * is intolerable to fire on page load, before the visitor has clicked anything.
+ *
+ * So a session restore checks this first and only reconnects to a wallet that has already said yes.
+ * Anything else waits for the visitor to press Connect.
+ */
+export async function isAlreadyPermitted(wallet: StarknetWallet): Promise<boolean> {
+  const api = walletApi(wallet);
+  if (!api) return false;
+  try {
+    const permissions = await api.request({ type: 'wallet_getPermissions' });
+    return Array.isArray(permissions) && permissions.length > 0;
+  } catch {
+    // A wallet that will not answer a permissions query is one we should not surprise with a
+    // connect prompt either.
+    return false;
+  }
+}

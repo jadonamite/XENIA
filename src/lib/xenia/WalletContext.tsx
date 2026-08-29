@@ -12,7 +12,13 @@ import React, {
 } from 'react';
 import { RpcProvider, WalletAccountV6 } from 'starknet';
 import { CHAIN } from './config';
-import { onWalletsChanged, probeWallet, type StarknetWallet, type WalletProbe } from './wallet';
+import {
+  isAlreadyPermitted,
+  onWalletsChanged,
+  probeWallet,
+  type StarknetWallet,
+  type WalletProbe,
+} from './wallet';
 import type { WalletState } from './useWallet';
 
 const WalletContext = createContext<WalletState | null>(null);
@@ -100,6 +106,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     restored.current = true;
     (async () => {
       try {
+        // Ask what the wallet has already granted before asking it for anything. Connecting
+        // prompts for an unlock and a site approval, and firing that on page load — before the
+        // visitor has clicked anything — is what made the extension pop up on every visit.
+        if (!(await isAlreadyPermitted(wallet))) {
+          remember(null);
+          return;
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const connected = await WalletAccountV6.connect(provider, wallet as any);
         setAccount(connected);
