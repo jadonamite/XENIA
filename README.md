@@ -177,9 +177,23 @@ docker run -p 3000:3000 \
   ghcr.io/starkware-libs/starknet-privacy/transaction-prover:PRIVACY-0.14.3-RC.2
 ```
 
-It takes an Invoke V3 transaction and returns `{ proof, proof_facts }`. With one running, Xenia
-could register a recipient itself — they sign one standard message, which any Starknet wallet can
-do — and pay them privately with no setup at all.
+It takes an Invoke V3 transaction and returns `{ proof, proof_facts }`. With one running, the
+claim link can register the recipient and then pay them, in that order, without either party
+setting anything up:
+
+1. The recipient opens the link and signs one ordinary message. Any Starknet wallet can do this;
+   it needs no STRK20 support of its own.
+2. Their viewing keypair is derived from that signature **in their browser**. Only the public half
+   ever leaves it.
+3. Xenia builds the registration, proves it, and submits it. Because the private half never
+   travelled, Xenia cannot read their notes afterwards — registering someone does not mean
+   surveilling them.
+4. They are registered, and the private transfer lands. Neither end is visible on chain.
+
+Note which half of this the Wallet API can already do and which it cannot. A wallet accepts five
+actions — `deposit`, `withdraw`, `transfer`, `invoke`, `shadowAccountInvoke` — and registration is
+not among them, so step 3 can never be delegated to the sender's wallet however the flow is
+arranged. It has to be a transaction we build and prove ourselves.
 
 What that costs, stated plainly: a host with real CPU and memory for STARK proving, an RPC node on
 the v0.10 API, a move from the Wallet API to the SDK route, and a discovery indexer, since
