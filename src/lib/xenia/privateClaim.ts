@@ -107,6 +107,11 @@ export async function submitPrivateClaimNoWallet(
     // Same-origin proxy — see src/app/api/paymaster/route.ts. No apiKey here: it stays server-side.
     url: '/api/paymaster',
     feeMode: { mode: 'sponsored_private', poolFeeToken: POOL_FEE_TOKEN, tip: 'normal' },
+    // The paymaster stores this on itself and calls it as `this.fetchFn(...)`, which rebinds `this`
+    // to the paymaster instance. Browsers reject that with "Illegal invocation"; Node does not,
+    // which is why the probe scripts never hit it. Bind it here rather than patching the vendored
+    // package.
+    fetch: globalThis.fetch.bind(globalThis),
   });
 
   const wallet = new SdkWallet({
