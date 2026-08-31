@@ -131,6 +131,36 @@ export const STALE_PROMPT =
   'through - dismiss or decline that prompt. Approving it a second time would send the ' +
   'transaction again and pay the pool fee twice.';
 
+/**
+ * How long to wait on a wallet before asking the chain instead.
+ *
+ * Generous on purpose: the clock starts when we ask, so it has to cover the person reading the
+ * prompt and the pool's own proving, not just the network.
+ */
+export const WALLET_DEADLINE_MS = 90_000;
+
+/**
+ * Rejects if `work` has not settled within `ms`, with a message `isInconclusive` recognises.
+ *
+ * A wallet request can simply never settle. Ready does this routinely: the transaction is proved,
+ * relayed and mined while the extension's own dialog stays open waiting for an approval it has
+ * already been given. Awaiting that promise waits forever — the spinner never stops, and on the
+ * create path the link is never saved, stranding money the sender has already spent.
+ *
+ * A deadline converts that hang into the inconclusive case every caller already handles: stop
+ * asking the wallet and ask the chain. Firing early is safe, because the recovery only reads —
+ * nothing downstream re-submits, so a slow approval costs a chain lookup and nothing else.
+ */
+export function withDeadline<T>(work: Promise<T>, ms: number = WALLET_DEADLINE_MS): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error('The wallet did not answer in time (timeout).')), ms);
+  });
+  return Promise.race([work, deadline]).finally(() => {
+    if (timer) clearTimeout(timer);
+  }) as Promise<T>;
+}
+
 export function isInconclusive(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /timeout|timed out|took too long|no response|deadline|aborted/i.test(message);

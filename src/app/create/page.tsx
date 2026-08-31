@@ -14,7 +14,7 @@ import {
 import { deriveAccountKey, generateLinkKey } from '@/lib/xenia/crypto';
 import { buildClaimLink } from '@/lib/xenia/link';
 import { saveClaim } from '@/lib/xenia/store';
-import { isInconclusive, STALE_PROMPT, waitForClaim } from '@/lib/xenia/escrow';
+import { isInconclusive, STALE_PROMPT, waitForClaim, withDeadline } from '@/lib/xenia/escrow';
 import { useWalletContext } from '@/lib/xenia/WalletContext';
 import { ClaimLinkCard } from '@/components/ClaimLinkCard';
 import { SlideToPay } from '@/components/app/SlideToPay';
@@ -91,30 +91,45 @@ export default function CreatePage() {
     const claimIdentity = deriveAccountKey(key.sk);
     const prefundAmount = POOL_FEE + 10n ** 18n; // fee + a small buffer for deployment gas
 
+    // Write the link down BEFORE spending anything.
+    //
+    // The transaction lands whether or not this page is still listening. A wallet request can hang
+    // forever, the tab can be closed, the browser can crash — and the claim exists on chain
+    // regardless, payable only by whoever holds this secret. Saving it after the await means a
+    // sender can pay for a link they never receive, and since both claiming and refunding need a
+    // signature from that secret, the money is then locked with nobody able to reach it.
+    //
+    // Saving first costs at worst a dead row in My Links when a transaction is rejected, which
+    // reads as "unknown" and can be dismissed. Saving last cost 14 STRK on 31 August.
+    const record = {
+      commitment: key.commitment,
+      pk: key.pk,
+      sk: key.sk,
+      tokenSymbol: token.symbol,
+      tokenAddress: token.address,
+      amount: units.toString(),
+      expiry,
+      createdAt: Math.floor(Date.now() / 1000),
+      txHash: '',
+    };
+    saveClaim(record);
+
     setBusy(true);
     try {
-      const { transaction_hash } = await wallet.account.strk20InvokeTransaction(
-        createClaimActions({
-          escrow: ESCROW_ADDRESS,
-          token: token.address,
-          amount: toHex(units),
-          commitment: key.commitment,
-          expiry,
-          refundTo: wallet.account.address,
-          prefund: { recipient: claimIdentity.address, amount: toHex(prefundAmount) },
-        }),
+      const { transaction_hash } = await withDeadline(
+        wallet.account.strk20InvokeTransaction(
+          createClaimActions({
+            escrow: ESCROW_ADDRESS,
+            token: token.address,
+            amount: toHex(units),
+            commitment: key.commitment,
+            expiry,
+            refundTo: wallet.account.address,
+            prefund: { recipient: claimIdentity.address, amount: toHex(prefundAmount) },
+          }),
+        ),
       );
-      saveClaim({
-        commitment: key.commitment,
-        pk: key.pk,
-        sk: key.sk,
-        tokenSymbol: token.symbol,
-        tokenAddress: token.address,
-        amount: units.toString(),
-        expiry,
-        createdAt: Math.floor(Date.now() / 1000),
-        txHash: transaction_hash,
-      });
+      saveClaim({ ...record, txHash: transaction_hash });
       setLink(buildClaimLink(window.location.origin, key.sk));
     } catch (cause) {
       // A timeout is not a failure. The transaction is proved and relayed before it lands, so the
@@ -126,17 +141,6 @@ export default function CreatePage() {
         const landed = await waitForClaim(key.commitment, (entry) => entry !== null);
         setWaiting(false);
         if (landed) {
-          saveClaim({
-            commitment: key.commitment,
-            pk: key.pk,
-            sk: key.sk,
-            tokenSymbol: token.symbol,
-            tokenAddress: token.address,
-            amount: units.toString(),
-            expiry,
-            createdAt: Math.floor(Date.now() / 1000),
-            txHash: '',
-          });
           setLink(buildClaimLink(window.location.origin, key.sk));
           setWarning(STALE_PROMPT);
           setBusy(false);

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { shieldActions } from '@/lib/xenia/actions';
-import { isInconclusive } from '@/lib/xenia/escrow';
+import { isInconclusive, withDeadline } from '@/lib/xenia/escrow';
 import { parseAmount, toHex } from '@/lib/xenia/amount';
 import { NETWORK, POOL_FEE, TOKENS, tokenBySymbol } from '@/lib/xenia/config';
 import { useWalletContext } from '@/lib/xenia/WalletContext';
@@ -58,8 +58,10 @@ export default function ShieldPage() {
 
     setBusy(true);
     try {
-      const { transaction_hash } = await wallet.account.strk20InvokeTransaction(
-        shieldActions({ token: token.address, amount: toHex(units) }),
+      const { transaction_hash } = await withDeadline(
+        wallet.account.strk20InvokeTransaction(
+          shieldActions({ token: token.address, amount: toHex(units) }),
+        ),
       );
       setTxHash(transaction_hash);
       setAmount('');
