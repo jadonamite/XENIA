@@ -9,7 +9,6 @@ import { NETWORK, POOL_FEE, TOKENS, tokenBySymbol } from '@/lib/xenia/config';
 import { useWalletContext } from '@/lib/xenia/WalletContext';
 import { SlideToPay } from '@/components/app/SlideToPay';
 import { TokenSelect } from '@/components/ui/TokenSelect';
-import { WalletBar } from '@/components/WalletBar';
 
 /**
  * Moving public funds into the privacy pool.
@@ -102,10 +101,6 @@ export default function ShieldPage() {
         inside, so this comes first. <strong>This step is public</strong> — your address, the token
         and the amount are all visible. What happens afterwards is not.
       </p>
-
-      <div style={{ marginBottom: 16 }}>
-        <WalletBar wallet={wallet} />
-      </div>
 
       {needsRegistration && (
         <div className="panel" style={{ marginBottom: 16 }}>

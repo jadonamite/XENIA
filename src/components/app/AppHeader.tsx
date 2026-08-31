@@ -65,7 +65,7 @@ export function AppHeader() {
                 transition: 'all 200ms ease',
               }}
             >
-              Send
+              Shield
             </Link>
             <Link
               href="/create"
