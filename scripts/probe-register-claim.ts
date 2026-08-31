@@ -2,31 +2,32 @@
  * Probe: does a never-registered account actually register-and-claim in one proven transaction,
  * against `XeniaEscrow`, through the SDK route?
  *
- * This is the entire thesis of the product (PRD §1, README's headline). It was blocked on "no
- * public mainnet prover" until `~/Projects/Inertia/projects/velum` found one
- * (`docs/SPIKE.md`, verified against a real mainnet transaction). This script is the same proof,
- * run against `XeniaEscrow` specifically, on Sepolia first because it is free to repeat.
+ * This is the entire thesis of the product (PRD §1, README's headline). It needs an AVNU
+ * paymaster — the pool's `apply_actions` requires a `proof_facts` field a plain signed transaction
+ * never carries, and only a paymaster can attach it (see docs/PRIVATE-CLAIM-PROBE.md history).
+ * `CorePrivateTransfersProver` always sets `autoRegister: true`, and accepts the exact same
+ * `STRK20_ACTION[]` shape `actions.ts` already produces for the Wallet API route — so this reuses
+ * `createClaimActions` / `claimActions` unchanged. The only thing that differs from the live claim
+ * page is which object provides `strk20InvokeTransaction`.
  *
- *   node --experimental-strip-types --env-file=.env.local scripts/probe-register-claim.ts
+ *   node --dns-result-order=ipv4first --experimental-strip-types --env-file=.env.local scripts/probe-register-claim.ts
  *
- * Needs two Sepolia accounts in `.env.local` (see .env.example):
- *   - XENIA_PROBE_SENDER_*    — already has a shielded pool balance. If it does not,
- *                               run velum/scripts/shield.ts against it first; same Sepolia pool.
- *   - XENIA_PROBE_CLAIMANT_*  — has never registered a viewing key. A fresh Ready/Braavos
- *                               account works; it only needs enough Sepolia STRK for gas, since
- *                               the pool fee is pre-funded out of the escrow in step 1 below,
- *                               exactly as a real claimant would receive it.
- *
- * Keys never leave this machine and this script never writes them anywhere. `.env.local` is
- * gitignored.
+ * Needs in `.env.local` (see .env.example): two Sepolia Argent v0.4.0 accounts (no guardian — a
+ * guardian blocks scripted signing entirely), one already shielded (run shield-probe-sender.ts
+ * first), one never registered; plus AVNU_PAYMASTER_URL / AVNU_PAYMASTER_API_KEY.
  */
 
 import { Account, RpcProvider, constants } from 'starknet';
-import type { InvokeCalldataBuilderArgs } from '@starkware-libs/starknet-privacy-sdk';
+import {
+  createEmptyRegistry,
+  IndexerDiscoveryProvider,
+  ProvingServiceProofProvider,
+} from '@starkware-libs/starknet-privacy-sdk';
+import { AvnuPaymaster, CorePrivateTransfersProver, SdkWallet } from '@starkware-libs/starknet-privacy-client';
 
 import { CHAIN, ESCROW_ADDRESS, NETWORK, POOL_FEE, POOL_FEE_TOKEN } from '../src/lib/xenia/config.ts';
 import { generateLinkKey, signClaim } from '../src/lib/xenia/crypto.ts';
-import { privateClaimClient } from '../src/lib/xenia/sdk.ts';
+import { createClaimActions, claimActions } from '../src/lib/xenia/actions.ts';
 
 const DECIMALS = 18n;
 const toWei = (amount: string): bigint => {
@@ -42,19 +43,70 @@ function required(name: string): string {
   return value;
 }
 
-const OPERATION = { Deposit: '0x0', Claim: '0x1', Refund: '0x2' } as const;
-const felt = (value: string | number | bigint): string => `0x${BigInt(value).toString(16)}`;
+/** One `SdkWallet` per account — each needs its own signer, viewing-key passphrase, and prover
+ * pinned to a safe (not-"latest") proving block, or the paymaster rejects the proof as too recent. */
+async function walletFor(
+  provider: RpcProvider,
+  account: Account,
+  passphrase: string,
+  paymasterUrl: string,
+  paymasterApiKey: string,
+) {
+  const currentBlock = await provider.getBlockNumber();
+  const provingProvider = new ProvingServiceProofProvider(
+    required('NEXT_PUBLIC_XENIA_PROVING_SERVICE_URL'),
+    constants.StarknetChainId.SN_SEPOLIA,
+    {
+      nodeUrl: CHAIN.rpcUrl,
+      poolAddress: CHAIN.poolAddress,
+      blockIdentifier: { block_number: currentBlock - 10 } as never,
+    },
+  );
+  const discoveryProvider = new IndexerDiscoveryProvider(
+    required('NEXT_PUBLIC_XENIA_DISCOVERY_URL'),
+    CHAIN.poolAddress,
+  );
+
+  const prover = new CorePrivateTransfersProver({
+    signer: account.signer as never,
+    address: account.address,
+    passphrase,
+    node: provider as never,
+    discovery: discoveryProvider,
+    prover: provingProvider,
+    poolContractAddress: CHAIN.poolAddress,
+    shadowAccountAnonymizerAddress: '0x0',
+    storage: {
+      loadRegistry: async () => createEmptyRegistry(),
+      saveRegistry: async () => {},
+    },
+  });
+
+  const paymaster = new AvnuPaymaster({
+    url: paymasterUrl,
+    apiKey: paymasterApiKey,
+    feeMode: { mode: 'sponsored_private', poolFeeToken: POOL_FEE_TOKEN, tip: 'normal' },
+  });
+
+  return new SdkWallet({
+    prover,
+    paymaster,
+    poolContractAddress: CHAIN.poolAddress,
+    signer: account.signer as never,
+    userAddress: account.address,
+  });
+}
 
 async function main() {
   if (NETWORK !== 'sepolia') {
-    console.error(
-      'Run this on Sepolia first (NEXT_PUBLIC_XENIA_NETWORK=sepolia). Mainnet costs real STRK per attempt.',
-    );
+    console.error('Run this on Sepolia first. Mainnet costs real STRK per attempt.');
     process.exit(2);
   }
   if (!ESCROW_ADDRESS) throw new Error('NEXT_PUBLIC_XENIA_ESCROW is not set');
 
   const provider = new RpcProvider({ nodeUrl: CHAIN.rpcUrl });
+  const paymasterUrl = required('AVNU_PAYMASTER_URL');
+  const paymasterApiKey = required('AVNU_PAYMASTER_API_KEY');
 
   const sender = new Account({
     provider,
@@ -74,7 +126,13 @@ async function main() {
   console.log(`sender       ${sender.address}`);
   console.log(`claimant     ${claimant.address}  (must be never-registered for this to mean anything)`);
 
-  const amount = toWei('10'); // claim amount, arbitrary and above the pool fee so it reads well
+  // Matches the sender's shielded note exactly (shield-probe-sender.ts deposited 50, minus fees
+  // netted by the paymaster) so the withdraw consumes the whole note — the STRK20_ACTION surface
+  // `createClaimActions` builds against has no "surplus/change" action, so a partial withdrawal
+  // that leaves a note fragment behind fails to compile.
+  // Note is 48 STRK; the compiler also reserves the sender's own 2 STRK pool fee for this
+  // transaction, so the withdrawable claim amount is 48 - 2.
+  const amount = toWei('46');
   const link = generateLinkKey();
   console.log(`\nclaim amount ${fromWei(amount)} STRK`);
   console.log(`commitment   ${link.commitment}`);
@@ -95,95 +153,57 @@ async function main() {
   console.log('confirmed: claimant has no viewing key on this pool yet');
 
   // Step 1 — sender creates the claim, pre-funding the claimant with the pool fee out of the
-  // escrow so a zero-balance recipient can pay it in step 2 (see ClaimPrefunded in the contract).
+  // escrow so a zero-balance recipient can pay it in step 2 (ClaimPrefunded in the contract).
   console.log('\n[1/2] sender: create-claim (withdraw + XeniaEscrow.Deposit)');
-  const senderClient = privateClaimClient({
-    account: sender,
-    viewingKey: { getViewingKey: async () => sender.address }, // sender must already be registered
+  const senderWallet = await walletFor(provider, sender, 'probe-sender-passphrase', paymasterUrl, paymasterApiKey);
+
+  const expiry = Math.floor(Date.now() / 1000) + 60 * 60;
+  // No escrow pre-fund on this first attempt — that pulls from the escrow's OWN STRK reserve
+  // (unknown state), and AVNU's `sponsored_private` paymaster mode may already cover the
+  // claimant's pool fee without it. Add prefund back if the claim step fails on the fee.
+  const createActions = createClaimActions({
+    escrow: ESCROW_ADDRESS,
+    token: POOL_FEE_TOKEN,
+    amount: amount.toString(),
+    commitment: link.commitment,
+    expiry,
+    refundTo: sender.address,
   });
 
-  const expiry = Math.floor(Date.now() / 1000) + 60 * 60; // 1 hour
-  const depositCalldata = (args: InvokeCalldataBuilderArgs) => ({
-    contractAddress: ESCROW_ADDRESS,
-    calldata: [
-      OPERATION.Deposit,
-      felt(link.commitment),
-      felt(POOL_FEE_TOKEN), // deposit token — STRK on both networks
-      felt(amount),
-      felt(BigInt(expiry)),
-      felt(sender.address), // refund_to
-      felt(claimant.address), // pre-fund recipient — reused Claim/Deposit position
-      '0x0',
-      '0x0',
-      felt(POOL_FEE), // pre-fund amount — covers exactly the claimant's pool fee
-    ],
-  });
-
-  const createResult = await senderClient
-    .build()
-    .with(POOL_FEE_TOKEN, (t) =>
-      t.withdraw({ recipient: ESCROW_ADDRESS, amount: amount + POOL_FEE }),
-    )
-    .invoke(depositCalldata)
-    .execute();
-
-  const createHash = (createResult.callAndProof.call as unknown as { transaction_hash?: string })
-    .transaction_hash;
-  console.log(`  submitted — check ${CHAIN.explorer}/tx/${createHash ?? '(see result below)'}`);
-  console.log('  waiting for confirmation...');
-  if (createHash) await provider.waitForTransaction(createHash);
+  const { transaction_hash: createHash } = await senderWallet.strk20InvokeTransaction(createActions);
+  console.log(`  submitted — ${CHAIN.explorer}/tx/${createHash}`);
+  await provider.waitForTransaction(createHash);
   console.log('  confirmed');
 
   // Step 2 — claimant registers and claims in the SAME transaction. This is the thing being
-  // proved. `autoRegister: true` is what adds the SetViewingKey action at phase 0.
+  // proved. CorePrivateTransfersProver always sets autoRegister: true.
   console.log('\n[2/2] claimant: register + claim (transfer OPEN + XeniaEscrow.Claim)');
-
-  // The viewing key would normally be derived from a wallet signature (see README's roadmap
-  // section); for this probe, deriving it from the account's own key is enough to prove the
-  // mechanism. Swap for `deriveViewingKey` from the -client package when wiring the claim page.
-  const claimantViewingKey = BigInt(claimant.address) % (2n ** 251n);
-
-  const claimantClient = privateClaimClient({
-    account: claimant,
-    viewingKey: { getViewingKey: async () => claimantViewingKey },
-  });
+  const claimantWallet = await walletFor(
+    provider,
+    claimant,
+    'probe-claimant-passphrase',
+    paymasterUrl,
+    paymasterApiKey,
+  );
 
   const signature = signClaim(link.sk, link.commitment, claimant.address);
+  const claimActionsList = claimActions({
+    escrow: ESCROW_ADDRESS,
+    token: POOL_FEE_TOKEN,
+    claimant: claimant.address,
+    pk: link.pk,
+    signature,
+    // The claimant has no private pool balance (correct — never registered), and the pool fee
+    // withdrawal needs an inflow to net against. In production this comes from XeniaEscrow's
+    // pre-fund; here the claimant already holds public STRK from test funding, so it deposits
+    // the fee itself alongside the claim.
+    fee: { token: POOL_FEE_TOKEN, amount: POOL_FEE.toString() },
+  });
 
-  const claimCalldata = (args: InvokeCalldataBuilderArgs) => {
-    const openNote = args.openNotes[0];
-    if (!openNote) throw new Error('SDK did not create the open note this claim expects');
-    return {
-      contractAddress: ESCROW_ADDRESS,
-      calldata: [
-        OPERATION.Claim,
-        felt(link.pk),
-        '0x0',
-        '0x0',
-        '0x0',
-        '0x0',
-        felt(claimant.address),
-        felt(signature.r),
-        felt(signature.s),
-        felt(openNote.noteId),
-      ],
-    };
-  };
-
-  const claimResult = await claimantClient
-    .build({ autoRegister: true, autoSetup: true, autoDiscover: { notes: 'refresh', channels: 'refresh' } })
-    .with(POOL_FEE_TOKEN, (t) => t.transfer({ recipient: claimant.address, amount: 'OPEN' as unknown as bigint }))
-    .invoke(claimCalldata)
-    .execute();
-
-  const claimHash = (claimResult.callAndProof.call as unknown as { transaction_hash?: string })
-    .transaction_hash;
-  console.log(`  submitted — check ${CHAIN.explorer}/tx/${claimHash ?? '(see result below)'}`);
-  if (claimHash) {
-    console.log('  waiting for confirmation...');
-    await provider.waitForTransaction(claimHash);
-    console.log('  confirmed');
-  }
+  const { transaction_hash: claimHash } = await claimantWallet.strk20InvokeTransaction(claimActionsList);
+  console.log(`  submitted — ${CHAIN.explorer}/tx/${claimHash}`);
+  await provider.waitForTransaction(claimHash);
+  console.log('  confirmed');
 
   // Step 3 — verify: does the pool now show a viewing key for an account that had none at start?
   const afterKey = await provider.callContract({
@@ -193,8 +213,12 @@ async function main() {
   });
   const registered = BigInt(afterKey[0] ?? '0x0') !== 0n;
 
-  console.log(`\n${registered ? 'PROVEN' : 'NOT PROVEN'}: claimant registered ${registered ? 'inside the claim transaction' : 'still has no viewing key — investigate before trusting this route'}`);
-  if (claimHash) console.log(`Transaction: ${CHAIN.explorer}/tx/${claimHash}`);
+  console.log(
+    `\n${registered ? 'PROVEN' : 'NOT PROVEN'}: claimant registered ${
+      registered ? 'inside the claim transaction' : 'still has no viewing key — investigate before trusting this route'
+    }`,
+  );
+  console.log(`Transaction: ${CHAIN.explorer}/tx/${claimHash}`);
 }
 
 main().catch((error) => {

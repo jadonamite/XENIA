@@ -11,7 +11,7 @@ import {
   TOKENS,
   tokenBySymbol,
 } from '@/lib/xenia/config';
-import { generateLinkKey } from '@/lib/xenia/crypto';
+import { deriveAccountKey, generateLinkKey } from '@/lib/xenia/crypto';
 import { buildClaimLink } from '@/lib/xenia/link';
 import { saveClaim } from '@/lib/xenia/store';
 import { isInconclusive, STALE_PROMPT, waitForClaim } from '@/lib/xenia/escrow';
@@ -84,6 +84,12 @@ export default function CreatePage() {
     const expiry = Math.floor(Date.now() / 1000) + expiryWindow;
 
     const key = generateLinkKey();
+    // The link's own key determines who claims — no wallet, no signature, just the link (see
+    // crypto.ts). The sender can compute that address right now, which is what makes pre-funding
+    // it possible: pay their pool fee and one-time account deployment out of the escrow's own
+    // reserve, so a recipient who has never touched Starknet can still submit the claim themselves.
+    const claimIdentity = deriveAccountKey(key.sk);
+    const prefundAmount = POOL_FEE + 10n ** 18n; // fee + a small buffer for deployment gas
 
     setBusy(true);
     try {
@@ -95,6 +101,7 @@ export default function CreatePage() {
           commitment: key.commitment,
           expiry,
           refundTo: wallet.account.address,
+          prefund: { recipient: claimIdentity.address, amount: toHex(prefundAmount) },
         }),
       );
       saveClaim({

@@ -24,7 +24,7 @@ import type {
   ViewingKey,
 } from '@starkware-libs/starknet-privacy-sdk';
 import { constants } from 'starknet';
-import { CHAIN, NETWORK } from './config';
+import { CHAIN, NETWORK } from './config.ts';
 
 function requiredPublicEnv(name: string): string {
   const value = process.env[name];

@@ -6,6 +6,7 @@ import { formatAmount, toHex } from '@/lib/xenia/amount';
 import { ESCROW_ADDRESS, POOL_FEE, POOL_FEE_TOKEN, TOKENS } from '@/lib/xenia/config';
 import { signClaim, signPublicClaim, type LinkKey } from '@/lib/xenia/crypto';
 import { readClaimFromLocation } from '@/lib/xenia/link';
+import { submitPrivateClaimNoWallet } from '@/lib/xenia/privateClaim';
 import {
   isInconclusive,
   isRegistered,
@@ -187,6 +188,41 @@ export default function ClaimPage() {
     }
   }
 
+
+  /**
+   * The actual product: register and claim privately with no wallet at all. The link's own key is
+   * the identity (crypto.ts's `deriveAccountKey`), pre-funded by the sender at create-claim time,
+   * proven and submitted through the SDK route validated in `scripts/probe-register-claim.ts`.
+   */
+  async function claimPrivateNoWallet() {
+    setError(null);
+    if (!key || !entry) return;
+    setBusy(true);
+    try {
+      const { transaction_hash } = await submitPrivateClaimNoWallet(key.sk, (claimantAddress) => {
+        const signature = signClaim(key.sk, key.commitment, claimantAddress);
+        return claimActions({
+          escrow: ESCROW_ADDRESS,
+          token: entry.token,
+          claimant: claimantAddress,
+          pk: key.pk,
+          signature,
+          fee: { token: POOL_FEE_TOKEN, amount: toHex(POOL_FEE) },
+        });
+      });
+      setTxHash(transaction_hash);
+      await refresh(key.commitment);
+    } catch (cause) {
+      if (await settledDespite(cause)) return;
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Could not complete the private claim. Try again in a moment.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   if (!ready) return <main className="app" />;
 
   if (!key) {
@@ -258,44 +294,53 @@ export default function ClaimPage() {
             <>
               <h2>Claim it</h2>
               <p className="note">
-                Connect any Starknet wallet. If you already use private balances you will be paid
-                privately; if you have never touched them, you can still be paid — see below.
+                No wallet needed. The link itself is your key — claiming registers you privately
+                and pays you in the same transaction.
               </p>
-              <WalletBar wallet={wallet} />
               {error && <p className="error">{error}</p>}
 
-              {offerPublic ? (
-                <>
-                  {/*
-                    Not a failure. The pool can only credit a private note to someone who has
-                    published a viewing key, and only they can publish it — so this wallet cannot
-                    be paid privately without a one-time setup. It can be paid publicly right now.
-                  */}
-                  <p className="note" style={{ marginTop: 16 }}>
-                    This wallet has never used private balances. You can still be paid right now:
-                  </p>
-                  <div className="row" style={{ marginTop: 16 }}>
-                    <PillButton disabled={!wallet.account || busy} onClick={claimPublicly}>
-                      {busy ? 'Waiting for the wallet…' : 'Claim as ordinary tokens'}
-                    </PillButton>
-                  </div>
-                  <p className="note" style={{ marginTop: 10, opacity: 0.8 }}>
-                    Paid straight to your wallet, nothing to set up. This transfer is public, so
-                    your address will be visible receiving it — the sender stays hidden either way.
-                  </p>
-                  <p className="note" style={{ marginTop: 14, opacity: 0.8 }}>
-                    Or set up private balances once in your wallet — in Ready, shield any amount
-                    from its privacy section — then reload this page and claim privately instead.
-                    The money stays here until you decide.
-                  </p>
-                </>
-              ) : (
-                <div className="row" style={{ marginTop: 16 }}>
-                  <PillButton disabled={!wallet.account || busy} onClick={claim}>
-                    {busy ? 'Waiting for the wallet…' : 'Claim'}
-                  </PillButton>
+              <div className="row" style={{ marginTop: 16 }}>
+                <PillButton disabled={busy} onClick={claimPrivateNoWallet}>
+                  {busy ? 'Proving and submitting… (about 30s)' : 'Claim privately'}
+                </PillButton>
+              </div>
+              <p className="note" style={{ marginTop: 10, opacity: 0.8 }}>
+                This proves and registers a private balance for you behind the scenes. It takes
+                about 30 seconds — that is normal, not a hang.
+              </p>
+
+              <details style={{ marginTop: 20 }}>
+                <summary className="note" style={{ cursor: 'pointer' }}>
+                  Have a Starknet wallet you already use for private balances?
+                </summary>
+                <div style={{ marginTop: 12 }}>
+                  <WalletBar wallet={wallet} />
+                  {offerPublic ? (
+                    <>
+                      <p className="note" style={{ marginTop: 16 }}>
+                        This wallet has never used private balances. You can still be paid
+                        publicly with it:
+                      </p>
+                      <div className="row" style={{ marginTop: 16 }}>
+                        <PillButton disabled={!wallet.account || busy} onClick={claimPublicly}>
+                          {busy ? 'Waiting for the wallet…' : 'Claim as ordinary tokens'}
+                        </PillButton>
+                      </div>
+                      <p className="note" style={{ marginTop: 10, opacity: 0.8 }}>
+                        Paid straight to your wallet, nothing to set up. This transfer is public,
+                        so your address will be visible receiving it — the sender stays hidden
+                        either way.
+                      </p>
+                    </>
+                  ) : (
+                    <div className="row" style={{ marginTop: 16 }}>
+                      <PillButton disabled={!wallet.account || busy} onClick={claim}>
+                        {busy ? 'Waiting for the wallet…' : 'Claim into this wallet instead'}
+                      </PillButton>
+                    </div>
+                  )}
                 </div>
-              )}
+              </details>
             </>
           )}
         </>

@@ -35,6 +35,47 @@ export const REFUND_TAG = shortString.encodeShortString('XENIA_REFUND_V1');
  * expose a recipient who had chosen privacy.
  */
 export const CLAIM_PUBLIC_TAG = shortString.encodeShortString('XENIA_CLAIM_PUBLIC_V1');
+/**
+ * Domain-separates the on-chain account the claim runs through from the link key itself. Both are
+ * derived from `sk`, but a signing key and an account key are different roles — keeping them
+ * cryptographically independent costs one hash and removes any question about reuse.
+ */
+export const ACCOUNT_TAG = shortString.encodeShortString('XENIA_ACCOUNT_V1');
+
+/** The STARK curve's order. A hash reduced mod the field prime can still exceed this; reduce again. */
+const STARK_CURVE_ORDER = 3618502788666131213697322783095070105526743751716087489154079457884512865583n;
+
+/**
+ * The Argent v0.4.0 preset, guardian-free. `constructor(owner: Signer, guardian: Option<Signer>)`
+ * serialises as `[Signer::Starknet variant (0), pubkey, Option::None variant (1)]` — verified against
+ * a real deployed Ready account's address, not assumed from the source. Declared on both networks.
+ */
+export const ARGENT_CLASS_HASH = '0x036078334509b514626504edc9fb252328d1a240e4e948bef8d0c08dff45927f';
+
+export interface AccountKey {
+  privateKey: string;
+  publicKey: string;
+  /** The counterfactual address — valid before deployment, since it depends only on the key. */
+  address: string;
+}
+
+/**
+ * Derives the on-chain Starknet account a claim runs through, straight from the link's private key.
+ *
+ * No wallet, no signature, no connection: the link is the entire identity, matching the bearer-link
+ * design everywhere else in Xenia. The sender can compute this address at create-claim time — before
+ * the recipient has done anything — which is what makes pre-funding it possible.
+ */
+export function deriveAccountKey(sk: string): AccountKey {
+  const seed = hash.computePoseidonHashOnElements([ACCOUNT_TAG, hexOf(sk)]);
+  const reduced = BigInt(seed) % STARK_CURVE_ORDER;
+  const privateKey = hexOf(reduced === 0n ? 1n : reduced);
+  const publicKey = hexOf(ec.starkCurve.getStarkKey(privateKey));
+  const address = hexOf(
+    hash.calculateContractAddressFromHash(publicKey, ARGENT_CLASS_HASH, [ '0x0', publicKey, '0x1' ], 0),
+  );
+  return { privateKey, publicKey, address };
+}
 
 export interface LinkKey {
   /** The private key. Lives in the URL fragment and nowhere else. */
