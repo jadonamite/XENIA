@@ -7,9 +7,11 @@
  * could live without giving the link away to a host — and a link the host can read is a link the
  * host can spend.
  *
- * The trade is stated in the UI: clear the browser and you lose the link, and with it the ability
- * to re-send it. The money is not lost, because expiry and refund are on-chain and keyed to the
- * sender's address rather than to anything stored here.
+ * The trade is real and it is not soft: this is the only copy of the link key. Refund is
+ * authorised by a signature under that key, not by the sender's address — `refund_to` is stored
+ * but gates nothing, and the escrow exposes no path that pays it without the signature. So
+ * clearing this browser with a claim still unclaimed strands those funds permanently, for
+ * everyone. Anything written here must say that, and the UI must give the sender a copy to keep.
  */
 
 const KEY = 'xenia.claims.v1';
