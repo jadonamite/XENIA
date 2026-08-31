@@ -12,6 +12,7 @@ export function SiteShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   const isAppView =
+    pathname === '/shield' ||
     pathname === '/create' ||
     pathname === '/claims' ||
     pathname?.startsWith('/c');
