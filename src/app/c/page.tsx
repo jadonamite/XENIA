@@ -4,7 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { claimActions } from '@/lib/xenia/actions';
 import { formatAmount, toHex } from '@/lib/xenia/amount';
 import { ESCROW_ADDRESS, POOL_FEE, POOL_FEE_TOKEN, TOKENS } from '@/lib/xenia/config';
-import { signClaim, signPublicClaim, type LinkKey } from '@/lib/xenia/crypto';
+import {
+  deriveAccountKey,
+  signClaim,
+  signPublicClaim,
+  type AccountKey,
+  type LinkKey,
+} from '@/lib/xenia/crypto';
 import { readClaimFromLocation } from '@/lib/xenia/link';
 import { submitPrivateClaimNoWallet } from '@/lib/xenia/privateClaim';
 import {
@@ -20,6 +26,7 @@ import {
 import { useWalletContext } from '@/lib/xenia/WalletContext';
 import { WalletBar } from '@/components/WalletBar';
 import { PillButton } from '@/components/site/Pill';
+import { ClaimedAccount } from '@/components/app/ClaimedAccount';
 
 const tokenLabel = (address: string) => {
   const known = TOKENS.find((t) => BigInt(t.address) === BigInt(address));
@@ -35,6 +42,12 @@ export default function ClaimPage() {
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [needsPublic, setNeedsPublic] = useState(false);
+  /**
+   * Set only by the private route, because only that route pays an account the claimant does
+   * not already have. A public or wallet claim lands in the wallet they just connected, so
+   * handing them a key there would be noise at best and a second secret to lose at worst.
+   */
+  const [claimAccount, setClaimAccount] = useState<AccountKey | null>(null);
 
   /**
    * Whether this account can be paid privately, read from the pool rather than from the wallet.
@@ -211,6 +224,7 @@ export default function ClaimPage() {
         });
       });
       setTxHash(transaction_hash);
+      setClaimAccount(deriveAccountKey(key.sk));
       await refresh(key.commitment);
     } catch (cause) {
       if (await settledDespite(cause)) return;
@@ -251,6 +265,7 @@ export default function ClaimPage() {
         <p className="note">
           Notes mature a few blocks after they are created, so give it a minute before spending.
         </p>
+        {claimAccount && <ClaimedAccount account={claimAccount} />}
       </main>
     );
   }

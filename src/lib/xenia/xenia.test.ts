@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   claimMessage,
   commitmentOf,
+  deriveAccountKey,
   generateLinkKey,
   linkKeyFromSecret,
   refundMessage,
@@ -44,6 +45,46 @@ describe('link keys', () => {
     const key = generateLinkKey();
     expect(key.commitment).toBe(commitmentOf(key.pk));
     expect(key.commitment).not.toBe(key.pk);
+  });
+});
+
+describe('the account a claim pays into', () => {
+  /**
+   * Pinned, not merely self-consistent.
+   *
+   * A private claim pays an account derived from the link and nothing else records where the money
+   * went. The claimant reaches it by deriving the same key again — so if this derivation ever
+   * changes, every balance claimed before the change becomes unreachable by anyone, permanently.
+   * Asserting the exact output makes that failure loud instead of silent.
+   */
+  const SECRET = '0x1234567890abcdef';
+
+  it('derives the same account from the same link, every time', () => {
+    const account = deriveAccountKey(SECRET);
+    expect(account.address).toBe(
+      '0x2a74749248c911fd6e0c42926bd2a42ecaa92133dfd3ba72d3992b103f8ff25',
+    );
+    expect(account.publicKey).toBe(
+      '0x4ee18ce62983499f696325e909963bc9d57aa09a4222de0efc2974e3b4ba1e',
+    );
+    expect(account.privateKey).toBe(
+      '0x1c2a047fb399fc2d9a73319130556f86a2eefd9481de4ecbdf090fc6f572a07',
+    );
+    expect(deriveAccountKey(SECRET)).toEqual(account);
+  });
+
+  it('gives every link its own account', () => {
+    const a = deriveAccountKey(generateLinkKey().sk);
+    const b = deriveAccountKey(generateLinkKey().sk);
+    expect(a.address).not.toBe(b.address);
+    expect(a.privateKey).not.toBe(b.privateKey);
+  });
+
+  it('keeps the account key distinct from the link key it comes from', () => {
+    // They authorise different things — the link key signs the claim, the account key pays the
+    // gas and holds the note. Collapsing them would let one leak imply the other.
+    const key = generateLinkKey();
+    expect(deriveAccountKey(key.sk).privateKey).not.toBe(key.sk);
   });
 });
 
