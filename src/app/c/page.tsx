@@ -12,7 +12,7 @@ import {
   type LinkKey,
 } from '@/lib/xenia/crypto';
 import { readClaimFromLocation } from '@/lib/xenia/link';
-import { submitPrivateClaimNoWallet } from '@/lib/xenia/privateClaim';
+import { submitAsClaimAccount } from '@/lib/xenia/privateClaim';
 import {
   isInconclusive,
   isRegistered,
@@ -212,7 +212,7 @@ export default function ClaimPage() {
     if (!key || !entry) return;
     setBusy(true);
     try {
-      const { transaction_hash } = await submitPrivateClaimNoWallet(key.sk, (claimantAddress) => {
+      const { transaction_hash } = await submitAsClaimAccount(key.sk, (claimantAddress) => {
         const signature = signClaim(key.sk, key.commitment, claimantAddress);
         return claimActions({
           escrow: ESCROW_ADDRESS,
@@ -294,7 +294,9 @@ export default function ClaimPage() {
         <p className="note">
           Notes mature a few blocks after they are created, so give it a minute before spending.
         </p>
-        {claimAccount && <ClaimedAccount account={claimAccount} />}
+        {claimAccount && token && (
+          <ClaimedAccount account={claimAccount} sk={key.sk} token={token} />
+        )}
       </main>
     );
   }
@@ -334,7 +336,9 @@ export default function ClaimPage() {
             </p>
           </div>
 
-          {status === 'claimed' && claimAccount && <ClaimedAccount account={claimAccount} />}
+          {status === 'claimed' && claimAccount && (
+            <ClaimedAccount account={claimAccount} sk={key.sk} token={token} />
+          )}
 
           {status === 'claimable' && (
             <>

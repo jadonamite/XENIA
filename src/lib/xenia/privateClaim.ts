@@ -55,7 +55,14 @@ export interface PrivateClaimResult {
   claimantAddress: string;
 }
 
-export async function submitPrivateClaimNoWallet(
+/**
+ * Runs any STRK20 action set *as the account a link owns*.
+ *
+ * Claiming was the first use and withdrawing is the second, but nothing here is specific to either:
+ * the account, its viewing key and its proving setup are all determined by `sk`, so the caller only
+ * has to say what it wants done.
+ */
+export async function submitAsClaimAccount(
   sk: string,
   buildActions: (claimantAddress: string) => Strk20Action[],
 ): Promise<PrivateClaimResult> {
@@ -124,4 +131,33 @@ export async function submitPrivateClaimNoWallet(
 
   const { transaction_hash } = await wallet.strk20InvokeTransaction(buildActions(identity.address));
   return { transaction_hash, claimantAddress: identity.address };
+}
+
+/**
+ * Moves a claimed private balance back out to an ordinary public address.
+ *
+ * This has to live in Xenia rather than in the recipient's wallet, and the reason is not a missing
+ * feature anywhere. The pool stores notes encrypted to a viewing key, and this account's was
+ * derived from `xenia-derived-identity-v1` salted with its address — a wallet handed the account
+ * key derives its own viewing key instead, decrypts nothing, and reports an empty private balance.
+ * Only a client that reproduces the same derivation can see the notes, let alone spend them.
+ *
+ * **What can actually be withdrawn is the balance less the pool's fee**, because the fee is charged
+ * as another withdrawal out of the same balance and the pool requires the transaction to net zero.
+ * A claim worth exactly the fee yields nothing, and no amount of funding from outside changes that
+ * — a deposit only lets you take back what you put in.
+ */
+export async function withdrawFromClaimAccount(
+  sk: string,
+  withdrawal: { token: string; amount: string; recipient: string },
+): Promise<PrivateClaimResult> {
+  const felt = (value: string) => `0x${BigInt(value).toString(16)}`;
+  return submitAsClaimAccount(sk, () => [
+    {
+      type: 'withdraw',
+      token: felt(withdrawal.token),
+      amount: felt(withdrawal.amount),
+      recipient: felt(withdrawal.recipient),
+    },
+  ]);
 }
