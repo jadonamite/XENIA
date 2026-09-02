@@ -163,8 +163,9 @@ export function ClaimedAccount({ account, sk, token }: ClaimedAccountProps) {
       ) : withdrawable === 0n ? (
         <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.7 }}>
           This balance is not more than the {fmt(POOL_FEE)} {token.symbol} the pool charges to move
-          it, so there is nothing to withdraw. It is not lost — anything paid into this account later
-          joins it, and one fee covers the whole balance whenever you do withdraw.
+          it, so there is nothing you can withdraw. Every claim link creates its own account, so
+          this one will not be topped up by a later payment — for a claim to be worth anything, it
+          has to be sent for more than the fee.
         </p>
       ) : (
         <>

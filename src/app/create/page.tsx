@@ -71,14 +71,21 @@ export default function CreatePage() {
     // The pool charges its fee on this transaction too, so a sender holding 10 STRK can create a
     // claim of at most 4. Warn, and let them decide.
     //
-    // Say which claim this is about. The fee falls on a *private* redemption, where the recipient
-    // pays the pool themselves. The public route costs them nothing at all — we relay it and cover
-    // the gas — so a flat "this costs 6 STRK to redeem" is wrong for exactly the recipient who
-    // most needs a small claim to be worth taking: the one arriving with an empty wallet.
+    // The fee the recipient meets is on the way *out*, not the way in. Claiming costs them nothing:
+    // the escrow pre-funds the account the link derives, so it pays its own pool fee and its own
+    // deployment. But moving the money out of the pool afterwards costs another fee, charged out of
+    // the same balance — so what they can actually take is the claim less one fee, and a claim worth
+    // the fee or under leaves them holding something they can never spend.
+    //
+    // This is the last point at which that is preventable, which is why it is stated here in terms
+    // of what they will be able to withdraw rather than what the pool charges.
+    const withdrawable = units - POOL_FEE;
     setWarning(
-      token.symbol === 'STRK' && units < POOL_FEE
-        ? `Redeeming this privately costs the recipient a ${formatAmount(POOL_FEE, 18)} STRK pool fee, which is more than the claim is worth. Claiming it publicly costs them nothing — Xenia pays the gas — so a first-time recipient is unaffected.`
-        : null,
+      token.symbol === 'STRK' && withdrawable <= 0n
+        ? `Moving this out of the pool costs a ${formatAmount(POOL_FEE, 18)} STRK fee, taken from the claim itself — so the recipient would be left with nothing they can withdraw. Send more than ${formatAmount(POOL_FEE, 18)} STRK for the claim to be worth taking.`
+        : token.symbol === 'STRK' && withdrawable < POOL_FEE
+          ? `After the ${formatAmount(POOL_FEE, 18)} STRK fee to move it out of the pool, the recipient can withdraw ${formatAmount(withdrawable, 18)} STRK.`
+          : null,
     );
 
     const expiry = Math.floor(Date.now() / 1000) + expiryWindow;
