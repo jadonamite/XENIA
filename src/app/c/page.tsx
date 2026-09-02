@@ -237,6 +237,35 @@ export default function ClaimPage() {
       setBusy(false);
     }
   }
+  /**
+   * Re-offer the account when someone comes back to their own link.
+   *
+   * `claimAccount` is set by the claim itself, which means it only survived as long as that browser
+   * tab did. But coming back to the link later is exactly how a recipient retrieves their money —
+   * and they would have found a page saying "already claimed" and nothing else, with no way to
+   * reach funds they own.
+   *
+   * Which route was used is readable from the chain rather than remembered: only the private claim
+   * registers the link's derived account with the pool. A public or wallet claim leaves it
+   * unregistered, and correctly shows nothing here, because that money went to a wallet they
+   * already have.
+   */
+  useEffect(() => {
+    if (!key || claimAccount || statusOf(entry) !== 'claimed') return;
+    let live = true;
+    const account = deriveAccountKey(key.sk);
+    isRegistered(account.address)
+      .then((registered) => {
+        if (live && registered) setClaimAccount(account);
+      })
+      .catch(() => {
+        // A failed read is not evidence either way; leave the panel hidden rather than guess.
+      });
+    return () => {
+      live = false;
+    };
+  }, [key, entry, claimAccount]);
+
   if (!ready) return <main className="app" />;
 
   if (!key) {
@@ -304,6 +333,8 @@ export default function ClaimPage() {
                 `Claimable until ${new Date(entry.expiry * 1000).toLocaleString()}.`}
             </p>
           </div>
+
+          {status === 'claimed' && claimAccount && <ClaimedAccount account={claimAccount} />}
 
           {status === 'claimable' && (
             <>
