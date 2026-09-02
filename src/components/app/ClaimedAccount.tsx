@@ -11,6 +11,13 @@
  *
  * The link is the key, so this reveals nothing a holder of the link could not already compute. What
  * it removes is the requirement to compute it, which in practice meant running a script.
+ *
+ * What it does NOT do is make the balance visible in a wallet, and the panel says so. The pool
+ * stores notes encrypted to a viewing key; `privateClaim.ts` derives this account's from the
+ * passphrase `xenia-derived-identity-v1` salted with the address, and that derivation is what is
+ * registered on chain. A wallet derives its own viewing key differently, so an imported account
+ * shows its public balance and nothing else. Reaching the private balance means reproducing
+ * Xenia's derivation — which, until a withdrawal screen exists, means Xenia.
  */
 
 import { useState } from 'react';
@@ -40,7 +47,8 @@ export function ClaimedAccount({ account }: { account: AccountKey }) {
       <div className="note" style={{ marginBottom: 6 }}>Where your money is</div>
       <p style={{ margin: '0 0 16px', fontSize: 15, lineHeight: 1.6 }}>
         This claim created a Starknet account from your link and paid into its private balance. The
-        account is yours — the link is its key. Import it into a wallet to spend or withdraw.
+        account is yours — the link is its key. Keep the link: it is what proves the account is
+        yours, and what any withdrawal will ask for.
       </p>
 
       <div className="note">Account address</div>
@@ -81,14 +89,18 @@ export function ClaimedAccount({ account }: { account: AccountKey }) {
         never paste it into a website, a chat, or a support ticket.
       </p>
 
-      <ol style={{ margin: '16px 0 0', paddingLeft: 20, fontSize: 14.5, lineHeight: 1.7 }}>
-        <li>Import the key into a Starknet wallet as an existing account.</li>
-        <li>Use the wallet&rsquo;s own private-balance controls to transfer or withdraw.</li>
-        <li>
-          A withdrawal costs the pool&rsquo;s {FEE} STRK fee, so you can take out your balance less{' '}
-          {FEE} STRK. Anything paid into this account later shares that one fee.
-        </li>
-      </ol>
+      <div className="note" style={{ marginTop: 20 }}>Reaching the balance</div>
+      <p style={{ margin: '4px 0 0', fontSize: 14.5, lineHeight: 1.7 }}>
+        Importing this key into a wallet gives you the account, but{' '}
+        <strong>not a view of its private balance</strong>. The pool keeps notes encrypted to a
+        viewing key, and this account&rsquo;s was derived by Xenia; a wallet computes its own
+        differently, so it will show only the public balance. Withdrawing has to go through Xenia,
+        which can reproduce that derivation.
+      </p>
+      <p style={{ margin: '10px 0 0', fontSize: 14.5, lineHeight: 1.7 }}>
+        A withdrawal also costs the pool&rsquo;s {FEE} STRK fee, so what you can take out is the
+        balance less {FEE} STRK. Anything paid into this account later shares that one fee.
+      </p>
     </div>
   );
 }
