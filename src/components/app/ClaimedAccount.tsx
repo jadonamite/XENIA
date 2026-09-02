@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The claimant's account, and the way out of it.
+ * The claimant's account, what it holds, and the way out of it.
  *
  * A private claim does not pay into a wallet. It derives a Starknet account from the link, deploys
  * it, registers its viewing key with the pool, and pays *that* — so the funds are held by an
@@ -9,42 +9,63 @@
  * derives the key in memory and never persists it. The claimant owned real money through an
  * identity nobody had shown them.
  *
- * Handing over the key is not enough on its own, which is why the withdrawal lives here too. The
- * pool stores notes encrypted to a viewing key, and `privateClaim.ts` derives this account's from
- * `xenia-derived-identity-v1` salted with the address — that derivation is what is registered on
- * chain. A wallet given the account key derives its own viewing key instead, decrypts nothing, and
- * shows an empty private balance next to whatever public tokens the account holds. So importing
- * gives you the account but never a view of the money, and the only client that can spend it is one
- * reproducing the same derivation.
- *
- * The key is still shown, because it is the claimant's and because the link already implies it, but
- * it is the fallback rather than the route.
+ * Handing over the account key is not a way out on its own. The pool stores notes encrypted to a
+ * viewing key derived from `CLAIM_ACCOUNT_PASSPHRASE` salted with the address, and that derivation
+ * is what is registered on chain — so a wallet given the account key derives its own viewing key,
+ * decrypts nothing, and shows an empty private balance beside whatever public tokens are there.
+ * Only a client reproducing the derivation can see the notes, which is why both the balance and the
+ * withdrawal live here.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatAmount, parseAmount, toHex } from '@/lib/xenia/amount';
 import { POOL_FEE } from '@/lib/xenia/config';
 import type { AccountKey } from '@/lib/xenia/crypto';
-import { withdrawFromClaimAccount } from '@/lib/xenia/privateClaim';
+import { privateBalanceOf, withdrawFromClaimAccount } from '@/lib/xenia/privateClaim';
 
-const FEE = formatAmount(POOL_FEE, 18);
 const ADDRESS = /^0x[0-9a-fA-F]{1,64}$/;
 
 export interface ClaimedAccountProps {
   account: AccountKey;
-  /** The link secret. Everything here is derived from it; it never leaves the browser. */
+  /** The link secret. Everything here derives from it; it never leaves the browser. */
   sk: string;
   token: { symbol: string; decimals: number; address: string };
 }
 
+type Destination = 'self' | 'other';
+
 export function ClaimedAccount({ account, sk, token }: ClaimedAccountProps) {
-  const [revealed, setRevealed] = useState(false);
-  const [copied, setCopied] = useState<'address' | 'key' | null>(null);
+  const [balance, setBalance] = useState<bigint | null>(null);
+  const [balanceError, setBalanceError] = useState(false);
+  const [destination, setDestination] = useState<Destination>('self');
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState<'address' | 'key' | null>(null);
+
+  // The balance is only readable by something that reproduces this account's viewing key, so it is
+  // read here rather than left to the claimant to discover elsewhere. Address-only: reading needs
+  // no signature.
+  useEffect(() => {
+    let live = true;
+    privateBalanceOf(account.address, token.address)
+      .then((held) => live && setBalance(held))
+      .catch(() => live && setBalanceError(true));
+    return () => {
+      live = false;
+    };
+  }, [account.address, token.address]);
+
+  /**
+   * The fee is charged as a second withdrawal out of the same balance, and the pool requires the
+   * transaction to net zero — so what can leave is always the balance less one fee, and a balance
+   * at or below the fee can move nothing at all.
+   */
+  const withdrawable = balance === null ? null : balance > POOL_FEE ? balance - POOL_FEE : 0n;
+  const fmt = (units: bigint) => formatAmount(units, token.decimals);
 
   async function copy(what: 'address' | 'key', value: string) {
     try {
@@ -52,14 +73,21 @@ export function ClaimedAccount({ account, sk, token }: ClaimedAccountProps) {
       setCopied(what);
       window.setTimeout(() => setCopied(null), 2000);
     } catch {
-      // Clipboard access is denied in some contexts. The value is on screen either way, so this is
-      // a lost convenience rather than a lost key.
+      // Denied in some contexts. The value is on screen either way — a lost convenience, not a
+      // lost key.
     }
+  }
+
+  function take(fraction: number) {
+    if (!withdrawable) return;
+    const units = fraction === 1 ? withdrawable : (withdrawable * BigInt(Math.round(fraction * 100))) / 100n;
+    setAmount(formatAmount(units, token.decimals));
   }
 
   async function withdraw() {
     setError(null);
-    if (!ADDRESS.test(recipient.trim())) {
+    const to = destination === 'self' ? account.address : recipient.trim();
+    if (!ADDRESS.test(to)) {
       setError('Enter the Starknet address to send to, starting 0x.');
       return;
     }
@@ -74,18 +102,20 @@ export function ClaimedAccount({ account, sk, token }: ClaimedAccountProps) {
       setError('Enter an amount above zero.');
       return;
     }
+    if (withdrawable !== null && units > withdrawable) {
+      setError(`The most you can withdraw is ${fmt(withdrawable)} ${token.symbol}, after the pool fee.`);
+      return;
+    }
 
     setBusy(true);
     try {
       const { transaction_hash } = await withdrawFromClaimAccount(sk, {
         token: token.address,
         amount: toHex(units),
-        recipient: recipient.trim(),
+        recipient: to,
       });
       setSent(transaction_hash);
     } catch (cause) {
-      // The pool's own refusal is the useful message — most often that the balance cannot cover the
-      // amount *and* the fee, which is the failure people will actually hit.
       setError(cause instanceof Error ? cause.message : 'The withdrawal did not go through.');
     } finally {
       setBusy(false);
@@ -94,12 +124,31 @@ export function ClaimedAccount({ account, sk, token }: ClaimedAccountProps) {
 
   return (
     <div className="panel" style={{ marginTop: 24, textAlign: 'left' }}>
-      <div className="note" style={{ marginBottom: 6 }}>Where your money is</div>
-      <p style={{ margin: '0 0 18px', fontSize: 15, lineHeight: 1.6 }}>
-        This claim created a Starknet account from your link and paid into its private balance. The
-        account is yours — the link is its key. Keep the link: it is what proves the account is
-        yours, and what this page needs to spend from it.
-      </p>
+      <div className="note" style={{ marginBottom: 6 }}>Your private balance</div>
+
+      {balance === null && !balanceError && (
+        <p style={{ margin: '0 0 16px', fontSize: 15 }}>Reading it from the pool…</p>
+      )}
+      {balanceError && (
+        <p className="error" style={{ margin: '0 0 16px' }}>
+          Could not read the balance just now. The money is unaffected — reload to try again.
+        </p>
+      )}
+      {balance !== null && (
+        <>
+          <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.2 }}>
+            {fmt(balance)} {token.symbol}
+          </div>
+          <p className="note" style={{ margin: '4px 0 18px' }}>
+            Held by an account this link created. Withdrawing costs the pool&rsquo;s{' '}
+            {fmt(POOL_FEE)} {token.symbol} fee, so{' '}
+            <strong>
+              {fmt(withdrawable ?? 0n)} {token.symbol}
+            </strong>{' '}
+            can leave.
+          </p>
+        </>
+      )}
 
       {sent ? (
         <>
@@ -108,32 +157,66 @@ export function ClaimedAccount({ account, sk, token }: ClaimedAccountProps) {
             {sent}
           </p>
           <p className="note" style={{ marginBottom: 0 }}>
-            It lands in a few blocks, as an ordinary {token.symbol} balance at the address you gave.
+            It lands in a few blocks as ordinary {token.symbol} at the address you chose.
           </p>
         </>
+      ) : withdrawable === 0n ? (
+        <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.7 }}>
+          This balance is not more than the {fmt(POOL_FEE)} {token.symbol} the pool charges to move
+          it, so there is nothing to withdraw. It is not lost — anything paid into this account later
+          joins it, and one fee covers the whole balance whenever you do withdraw.
+        </p>
       ) : (
         <>
-          <div className="note">Withdraw to an address</div>
-          <p style={{ margin: '4px 0 12px', fontSize: 14.5, lineHeight: 1.6 }}>
-            Sends out of the pool as ordinary {token.symbol}, spendable anywhere. The pool charges{' '}
-            {FEE} {token.symbol} for this, taken from the same balance — so you can withdraw what
-            you hold less {FEE}.
-          </p>
+          <div className="note">Send it to</div>
+          <div style={{ display: 'flex', gap: 8, margin: '6px 0 12px', flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => setDestination('self')} style={choice(destination === 'self')}>
+              This account
+            </button>
+            <button type="button" onClick={() => setDestination('other')} style={choice(destination === 'other')}>
+              Another address
+            </button>
+          </div>
 
-          <input
-            value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
-            placeholder="Destination address, 0x…"
-            spellCheck={false}
-            style={field}
-          />
+          {destination === 'self' ? (
+            <p style={{ margin: '0 0 12px', fontSize: 14, lineHeight: 1.6 }}>
+              Unshields into this same account&rsquo;s ordinary balance, at{' '}
+              <span className="mono" style={{ fontSize: 12.5, wordBreak: 'break-all' }}>
+                {account.address}
+              </span>
+              . Import the key below and any wallet will show it — public tokens need no viewing key.
+            </p>
+          ) : (
+            <input
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+              placeholder="Exchange deposit address, or any Starknet address, 0x…"
+              spellCheck={false}
+              style={{ ...field, marginBottom: 12 }}
+            />
+          )}
+
+          <div className="note">Amount</div>
           <input
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             inputMode="decimal"
             placeholder={`Amount in ${token.symbol}`}
-            style={{ ...field, marginTop: 8 }}
+            style={{ ...field, marginTop: 6 }}
           />
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            {([['25%', 0.25], ['50%', 0.5], ['Max', 1]] as const).map(([label, fraction]) => (
+              <button
+                key={label}
+                type="button"
+                disabled={!withdrawable}
+                onClick={() => take(fraction)}
+                style={choice(false)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
           {error && (
             <p className="error" style={{ marginTop: 10, marginBottom: 0 }}>
@@ -141,7 +224,7 @@ export function ClaimedAccount({ account, sk, token }: ClaimedAccountProps) {
             </p>
           )}
 
-          <button type="button" disabled={busy} onClick={withdraw} style={{ ...btn(false), marginTop: 12 }}>
+          <button type="button" disabled={busy} onClick={withdraw} style={{ ...btn(false), marginTop: 14 }}>
             {busy ? 'Proving and submitting… (about 30s)' : 'Withdraw'}
           </button>
         </>
@@ -157,9 +240,9 @@ export function ClaimedAccount({ account, sk, token }: ClaimedAccountProps) {
 
       <div className="note" style={{ marginTop: 20 }}>Private key</div>
       <p style={{ margin: '4px 0 8px', fontSize: 14, lineHeight: 1.6 }}>
-        You do not need this to withdraw above. It proves the account is yours, and lets you use its
-        public balance elsewhere — but a wallet you import it into will <strong>not</strong> show the
-        private balance, because it derives a different viewing key and cannot decrypt these notes.
+        Not needed to withdraw above. It proves the account is yours and lets you spend its public
+        balance from a wallet — but a wallet will <strong>not</strong> show the private balance, since
+        it derives a different viewing key and cannot decrypt these notes.
       </p>
       {revealed ? (
         <>
@@ -194,6 +277,17 @@ const field: React.CSSProperties = {
   background: 'var(--card-raised, #fff)',
   color: 'inherit',
 };
+
+const choice = (on: boolean): React.CSSProperties => ({
+  background: on ? 'var(--accent, #1391E2)' : 'transparent',
+  color: on ? '#fff' : 'inherit',
+  border: `1px solid ${on ? 'var(--accent, #1391E2)' : 'var(--hairline, #dfe1e3)'}`,
+  borderRadius: 'var(--r-chip, 9px)',
+  padding: '7px 13px',
+  fontSize: 13.5,
+  fontWeight: 500,
+  cursor: 'pointer',
+});
 
 const btn = (done: boolean): React.CSSProperties => ({
   background: done ? '#10794a' : 'var(--accent, #1391E2)',
